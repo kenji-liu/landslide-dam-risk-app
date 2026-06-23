@@ -40,6 +40,147 @@ const matayanPreset = {
 
 let latest = {};
 
+function svgShell(title, inner) {
+  return `
+    <span class="param-sketch" aria-label="${title}">
+      <span class="sketch-title">${title}</span>
+      <svg viewBox="0 0 220 92" role="img" aria-hidden="true">
+        ${inner}
+      </svg>
+    </span>
+  `;
+}
+
+const parameterSketches = {
+  caseName: svgShell("範例：案件命名", `
+    <rect x="18" y="16" width="82" height="58" rx="8" class="sketch-paper"></rect>
+    <line x1="31" y1="34" x2="86" y2="34" class="sketch-line"></line>
+    <line x1="31" y1="48" x2="76" y2="48" class="sketch-line"></line>
+    <circle cx="145" cy="45" r="23" class="sketch-water"></circle>
+    <text x="118" y="80" class="sketch-text">自訂名稱</text>
+  `),
+  trigger: svgShell("範例：誘發事件", `
+    <path d="M48 36c0-15 24-17 29-5 15-4 27 6 27 19 0 11-9 18-22 18H49c-15 0-25-7-25-18 0-9 8-15 24-14z" class="sketch-cloud"></path>
+    <line x1="50" y1="72" x2="44" y2="86" class="sketch-rain"></line>
+    <line x1="72" y1="72" x2="66" y2="86" class="sketch-rain"></line>
+    <path d="M132 66l19-39 9 25 12-18 16 32" class="sketch-warning"></path>
+    <text x="28" y="18" class="sketch-text">降雨 / 地震 / 土石流</text>
+  `),
+  damType: svgShell("範例：壩體型態", `
+    <path d="M18 72c35-6 60-6 86 0 36 8 62 5 98-7" class="sketch-river"></path>
+    <path d="M92 70l34-46 36 46z" class="sketch-dam"></path>
+    <path d="M30 58c28-14 48-17 70-14" class="sketch-slope"></path>
+    <text x="91" y="20" class="sketch-text">崩滑型 / 土石流型</text>
+  `),
+  catchmentArea: svgShell("範例：圈繪上游集水區", `
+    <path d="M32 74C22 50 41 21 77 18c42-4 78 18 98 48-40 17-101 18-143 8z" class="sketch-basin"></path>
+    <path d="M78 22c14 18 26 29 43 44" class="sketch-flow"></path>
+    <circle cx="152" cy="67" r="7" class="sketch-dam-dot"></circle>
+    <text x="42" y="85" class="sketch-text">以壩址為出口</text>
+  `),
+  landslideArea: svgShell("範例：圈繪崩塌面積", `
+    <path d="M22 74L72 20h55l72 54z" class="sketch-mountain"></path>
+    <path d="M79 26c-16 15-27 30-31 48h54c-2-17-8-32-23-48z" class="sketch-slide"></path>
+    <path d="M47 75c37 6 83 6 126 0" class="sketch-river"></path>
+    <text x="43" y="17" class="sketch-text">圈繪裸露區</text>
+  `),
+  landslideVolume: svgShell("範例：災前災後差分", `
+    <path d="M22 66c34-28 76-30 119-9 22 10 40 10 59 5" class="sketch-before"></path>
+    <path d="M22 78c34-8 76-8 119-4 22 2 40 2 59-3" class="sketch-after"></path>
+    <path d="M62 55c18 16 55 17 76 4v17H62z" class="sketch-volume"></path>
+    <text x="62" y="25" class="sketch-text">DEM 差分體積</text>
+  `),
+  damVolume: svgShell("範例：壩體體積", `
+    <path d="M18 72c38-8 67-9 96 0 37 11 62 5 88-4" class="sketch-river"></path>
+    <path d="M78 71l32-43 49 43z" class="sketch-dam"></path>
+    <path d="M91 64l21-27 31 27z" class="sketch-volume"></path>
+    <text x="83" y="22" class="sketch-text">壩體範圍 x 高差</text>
+  `),
+  damHeight: svgShell("範例：壩高 H", `
+    <path d="M26 74h170" class="sketch-ground"></path>
+    <path d="M82 74l35-48 47 48z" class="sketch-dam"></path>
+    <line x1="119" y1="28" x2="119" y2="74" class="sketch-measure"></line>
+    <text x="126" y="55" class="sketch-text">H</text>
+    <text x="68" y="86" class="sketch-text">原河床至溢流點</text>
+  `),
+  damWidth: svgShell("範例：壩寬 W", `
+    <path d="M24 72h170" class="sketch-ground"></path>
+    <path d="M74 72l38-42 44 42z" class="sketch-dam"></path>
+    <line x1="74" y1="80" x2="156" y2="80" class="sketch-measure"></line>
+    <text x="109" y="90" class="sketch-text">W</text>
+  `),
+  damLength: svgShell("範例：沿河道壩長 L", `
+    <path d="M22 58c39-19 75-15 110-1 25 10 45 11 67 2" class="sketch-river"></path>
+    <ellipse cx="112" cy="58" rx="48" ry="17" class="sketch-dam"></ellipse>
+    <line x1="65" y1="31" x2="159" y2="31" class="sketch-measure"></line>
+    <text x="103" y="25" class="sketch-text">L</text>
+  `),
+  channelSlope: svgShell("範例：河床坡降 S", `
+    <line x1="24" y1="72" x2="196" y2="34" class="sketch-ground"></line>
+    <line x1="46" y1="74" x2="170" y2="74" class="sketch-measure"></line>
+    <line x1="170" y1="74" x2="170" y2="40" class="sketch-measure"></line>
+    <text x="92" y="87" class="sketch-text">水平距離</text>
+    <text x="176" y="61" class="sketch-text">高差</text>
+  `),
+  waterVolume: svgShell("範例：蓄水體積", `
+    <path d="M23 74h174" class="sketch-ground"></path>
+    <path d="M95 73l27-40 39 40z" class="sketch-dam"></path>
+    <path d="M39 72c20-27 42-37 82-25v25z" class="sketch-water"></path>
+    <text x="47" y="38" class="sketch-text">水面 x 水深</text>
+  `),
+  breachHeight: svgShell("範例：潰口高度", `
+    <path d="M26 74h170" class="sketch-ground"></path>
+    <path d="M77 74l38-47 48 47z" class="sketch-dam"></path>
+    <path d="M116 28l9 26 9-26" class="sketch-breach"></path>
+    <line x1="142" y1="30" x2="142" y2="74" class="sketch-measure"></line>
+    <text x="148" y="55" class="sketch-text">Hb</text>
+  `),
+  breachTime: svgShell("範例：潰壩歷時", `
+    <line x1="30" y1="72" x2="190" y2="72" class="sketch-ground"></line>
+    <path d="M45 72c28-48 58-48 85 0" class="sketch-hydro"></path>
+    <line x1="45" y1="82" x2="130" y2="82" class="sketch-measure"></line>
+    <text x="75" y="91" class="sketch-text">Tc</text>
+    <text x="68" y="22" class="sketch-text">洪峰歷線時間</text>
+  `),
+  riverWidth: svgShell("範例：代表河寬", `
+    <path d="M28 35c32 12 56 12 82 0 28-13 55-12 82 0" class="sketch-bank"></path>
+    <path d="M28 65c32-12 56-12 82 0 28 13 55 12 82 0" class="sketch-bank"></path>
+    <path d="M39 49c36 9 99 9 141 0v10c-42 9-105 9-141 0z" class="sketch-water"></path>
+    <line x1="38" y1="78" x2="181" y2="78" class="sketch-measure"></line>
+    <text x="100" y="90" class="sketch-text">Bw</text>
+  `),
+  flowVelocity: svgShell("範例：代表流速", `
+    <path d="M26 62c33-14 58-13 86 0 31 14 55 13 84 0" class="sketch-river"></path>
+    <line x1="50" y1="48" x2="102" y2="48" class="sketch-arrow"></line>
+    <line x1="78" y1="62" x2="150" y2="62" class="sketch-arrow"></line>
+    <text x="63" y="31" class="sketch-text">水理模式 / 現地估算</text>
+  `),
+  protectedHeight: svgShell("範例：保全高程差", `
+    <path d="M24 76h170" class="sketch-ground"></path>
+    <path d="M30 70c31-10 60-10 92 0" class="sketch-water"></path>
+    <rect x="142" y="40" width="34" height="36" rx="3" class="sketch-house"></rect>
+    <line x1="132" y1="76" x2="132" y2="48" class="sketch-measure"></line>
+    <text x="104" y="57" class="sketch-text">Hpo</text>
+  `),
+  exposure: svgShell("範例：保全對象", `
+    <path d="M20 70c44-12 82-12 124 0" class="sketch-river"></path>
+    <rect x="151" y="35" width="24" height="35" rx="3" class="sketch-house"></rect>
+    <rect x="181" y="45" width="20" height="25" rx="3" class="sketch-house"></rect>
+    <line x1="126" y1="60" x2="190" y2="60" class="sketch-warning"></line>
+    <text x="116" y="25" class="sketch-text">聚落 / 道路 / 橋梁</text>
+  `)
+};
+
+function addParameterSketches() {
+  Object.entries(parameterSketches).forEach(([name, markup]) => {
+    const control = form.elements[name];
+    if (!control) return;
+    const field = control.closest(".param-field");
+    if (!field || field.querySelector(".param-sketch")) return;
+    field.insertAdjacentHTML("beforeend", markup);
+  });
+}
+
 function num(name) {
   const value = Number(form.elements[name].value);
   return Number.isFinite(value) ? value : 0;
@@ -404,4 +545,5 @@ document.querySelector("#copyReport").addEventListener("click", async () => {
   setTimeout(() => (document.querySelector("#copyReport").textContent = "複製摘要"), 1200);
 });
 
+addParameterSketches();
 compute();
