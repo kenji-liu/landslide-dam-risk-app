@@ -485,11 +485,61 @@ label {
   font-weight: 800;
 }
 
+.param-field {
+  display: block;
+  position: relative;
+  min-height: 158px;
+  padding: 13px 13px 13px 58px;
+  border: 1px solid #d5e5ef;
+  border-radius: 12px;
+  background: #fbfdff;
+  box-shadow: 0 4px 12px rgba(47, 77, 102, 0.05);
+}
+
+.param-field::before {
+  content: attr(data-icon);
+  position: absolute;
+  top: 13px;
+  left: 13px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #0f5d73;
+  background: linear-gradient(135deg, #e6f6fb, #eef8f4);
+  border: 1px solid #c9e2ed;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.param-field input,
+.param-field select {
+  margin-top: 2px;
+}
+
 .field-help {
+  display: block;
+  margin-top: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
   color: #70869a;
+  background: #f2f7fb;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
+}
+
+.field-help::before {
+  content: "填寫說明";
+  display: inline-flex;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #0f6e82;
+  background: #dff4f7;
+  font-size: 11px;
+  font-weight: 900;
 }
 
 input, select, textarea {
