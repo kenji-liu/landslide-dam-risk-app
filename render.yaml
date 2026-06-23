@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: landslide-dam-risk-app
+    runtime: static
+    buildCommand: echo "Static site - no build step"
+    staticPublishPath: ./docs
+    previews:
+      generation: manual
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-store

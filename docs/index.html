@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>堰塞湖緊急調查與風險評估平台</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-mark">≋</div>
+        <div>
+          <strong>堰塞湖專家評估</strong>
+          <small>Emergency Risk Review</small>
+        </div>
+      </div>
+      <button class="nav-item active" data-page="dashboard"><span>▦</span> 專家總覽</button>
+      <button class="nav-item" data-page="survey"><span>▣</span> 調查參數</button>
+      <button class="nav-item" data-page="risk"><span>▤</span> 風險演算</button>
+      <button class="nav-item" data-page="gis"><span>◎</span> 空間研判</button>
+      <button class="nav-item" data-page="report"><span>▨</span> 通報報告</button>
+      <button class="nav-item" data-page="ai"><span>AI</span> 專家摘要</button>
+      <div class="sidebar-footer">水土保持 · UAV · GIS · 風險治理</div>
+    </nav>
+
+    <main class="main-content">
+      <header class="top-bar">
+        <div>
+          <h1 id="pageTitle">專家總覽</h1>
+          <p>以堰塞湖專家判讀流程重組：先看風險結論，再回溯壩體參數、安定性指標、下游保全與處置策略。</p>
+        </div>
+        <div class="top-actions">
+          <span id="dateDisplay"></span>
+          <button id="loadMatayan" type="button">載入馬太鞍案例</button>
+          <button id="exportData" type="button" class="outline">匯出資料</button>
+          <button id="printReport" type="button" class="outline">列印報告</button>
+        </div>
+      </header>
+
+      <section class="page active" id="dashboard">
+        <div class="hero-panel">
+          <div>
+            <span class="section-kicker">Expert Review</span>
+            <h2 id="caseHeadline">馬太鞍溪堰塞湖</h2>
+            <p id="caseLead">預設採馬太鞍案例參數，展示從緊急調查、安定性判讀到保全危害度與處置建議的完整工作流。</p>
+          </div>
+          <div id="riskStamp" class="risk-stamp">極高風險</div>
+        </div>
+        <section class="expert-panel">
+          <div class="expert-heading">
+            <span>專家綜合判讀</span>
+            <h2>以壩體破壞機制與保全對象為核心的初判結論</h2>
+          </div>
+          <div id="expertFindings" class="expert-findings"></div>
+        </section>
+        <div id="summaryCards" class="cards metric-cards"></div>
+        <div class="module-grid">
+          <article class="module-card">
+            <div class="module-title"><span class="icon blue">▣</span><h3>資料可靠度</h3></div>
+            <div class="progress"><span id="surveyProgress"></span></div>
+            <p>目前已納入壩體幾何、上游集水區、蓄水量、潰壩歷時、下游河寬與保全對象條件。</p>
+          </article>
+          <article class="module-card">
+            <div class="module-title"><span class="icon green">▤</span><h3>關鍵指標摘要</h3></div>
+            <div id="decisionDigest" class="digest"></div>
+          </article>
+          <article class="module-card">
+            <div class="module-title"><span class="icon orange">◎</span><h3>空間風險概念圖</h3></div>
+            <div class="mini-map">
+              <span class="dam-point">堰塞壩</span>
+              <span class="lake-zone">蓄水區</span>
+              <span class="risk-corridor">下游影響廊道</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="survey">
+        <div class="toolbar-card">
+          <div>
+            <h2>調查參數</h2>
+            <p>依專家現地初判順序排列：先確認成因與壩體幾何，再檢核蓄水、潰壩歷時與下游保全條件。</p>
+          </div>
+          <button id="clearForm" type="button" class="outline">清空輸入</button>
+        </div>
+        <form id="assessmentForm" class="form-grid">
+          <fieldset>
+            <legend>案件資訊</legend>
+            <label>案件名稱<input name="caseName" value="馬太鞍溪堰塞湖" /></label>
+            <label>誘發原因<select name="trigger"><option>降雨</option><option>地震</option><option>土石流</option><option>未知</option></select></label>
+            <label>壩體類型<select name="damType"><option>崩滑型堰塞壩</option><option>土石流型堰塞壩</option><option>複合型</option></select></label>
+          </fieldset>
+          <fieldset>
+            <legend>地形與壩體</legend>
+            <label>上游集水區面積 A<sub>D</sub> (m²)<input name="catchmentArea" type="number" value="63230000" min="0" step="1" /></label>
+            <label>崩塌面積 A<sub>L</sub> (m²)<input name="landslideArea" type="number" value="5000000" min="0" step="1" /></label>
+            <label>崩塌體積 V<sub>L</sub> (m³)<input name="landslideVolume" type="number" value="320000000" min="0" step="1" /></label>
+            <label>壩體體積 V<sub>D</sub> (m³)<input name="damVolume" type="number" value="200000000" min="0" step="1" /></label>
+            <label>壩高 H<sub>Dmin</sub> (m)<input name="damHeight" type="number" value="200" min="0" step="0.1" /></label>
+            <label>壩寬 W<sub>D</sub> (m)<input name="damWidth" type="number" value="2300" min="0" step="0.1" /></label>
+            <label>壩長 L<sub>DTop</sub> (m)<input name="damLength" type="number" value="600" min="0" step="0.1" /></label>
+            <label>河床坡降 S (m/m)<input name="channelSlope" type="number" value="0.114" min="0" step="0.001" /></label>
+          </fieldset>
+          <fieldset>
+            <legend>蓄水與下游保全</legend>
+            <label>蓄水體積 V<sub>W</sub> (m³)<input name="waterVolume" type="number" value="91000000" min="0" step="1" /></label>
+            <label>潰口高度 H<sub>b</sub> (m)<input name="breachHeight" type="number" value="200" min="0" step="0.1" /></label>
+            <label>潰壩歷時 T<sub>c</sub> (hr)<input name="breachTime" type="number" value="2" min="0.1" step="0.1" /></label>
+            <label>代表河道寬 B<sub>w</sub> (m)<input name="riverWidth" type="number" value="449.5" min="0" step="0.1" /></label>
+            <label>代表流速 v<sub>w</sub> (m/s)<input name="flowVelocity" type="number" value="10" min="0" step="0.1" /></label>
+            <label>保全對象高程差 H<sub>po</sub> (m)<input name="protectedHeight" type="number" value="4.4" min="0" step="0.1" /></label>
+            <label>保全對象條件<select name="exposure"><option value="high">影響潛勢區內有保全對象或重要設施</option><option value="medium">下游有受影響疑慮或河床活動紀錄</option><option value="low">下游無保全對象且人員不易抵達</option></select></label>
+          </fieldset>
+        </form>
+      </section>
+
+      <section class="page" id="risk">
+        <div class="result-grid">
+          <article class="module-card">
+            <h2>安定性評估</h2>
+            <div id="stabilityResults" class="tablelike"></div>
+          </article>
+          <article class="module-card">
+            <h2>洪峰流量與水位初估</h2>
+            <div id="hydroResults" class="tablelike"></div>
+          </article>
+        </div>
+        <article class="module-card decision">
+          <h2>致災風險矩陣</h2>
+          <div class="matrix">
+            <div></div><strong>潰壩危險度較低</strong><strong>潰壩危險度較高</strong>
+            <strong>保全危害度低</strong><span data-cell="low-low">暫無風險</span><span data-cell="low-high">低風險</span>
+            <strong>保全危害度中</strong><span data-cell="mid-low">低風險</span><span data-cell="mid-high">高風險</span>
+            <strong>保全危害度高</strong><span data-cell="high-low">高風險</span><span data-cell="high-high">極高風險</span>
+          </div>
+          <div id="recommendation" class="recommendation"></div>
+        </article>
+      </section>
+
+      <section class="page" id="gis">
+        <div class="toolbar-card">
+          <div>
+            <h2>空間研判</h2>
+            <p>以堰塞壩、蓄水區、潰決洪水廊道與保全對象為主圖層，輔助專家判斷下游暴露程度。</p>
+          </div>
+          <button class="outline" type="button">匯入圖層</button>
+        </div>
+        <div class="gis-layout">
+          <div class="map-board">
+            <span class="map-label dam">天然壩體</span>
+            <span class="map-label lake">堰塞湖蓄水範圍</span>
+            <span class="map-label village">下游保全聚落</span>
+            <span class="map-label route">撤離路線</span>
+          </div>
+          <div class="layer-panel">
+            <h3>圖層清單</h3>
+            <label><input type="checkbox" checked /> UAV 正射影像</label>
+            <label><input type="checkbox" checked /> DEM 差分壩體範圍</label>
+            <label><input type="checkbox" checked /> 下游洪水影響廊道</label>
+            <label><input type="checkbox" checked /> 保全對象與橋梁道路</label>
+            <label><input type="checkbox" /> Sentinel-2 變異偵測</label>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="report">
+        <div class="toolbar-card">
+          <div>
+            <h2>通報與報告</h2>
+            <p>彙整成可直接貼入緊急調查紀錄、會議簡報或通報單的摘要。</p>
+          </div>
+          <button id="copyReport" type="button">複製摘要</button>
+        </div>
+        <textarea id="reportText" readonly></textarea>
+        <div class="workflow">
+          <h3>現地作業檢核</h3>
+          <div class="steps">
+            <label><input type="checkbox" /> 成因判釋與壩體類型確認</label>
+            <label><input type="checkbox" /> UAV/衛星影像圈繪崩塌與蓄水範圍</label>
+            <label><input type="checkbox" /> DEM 剖面量測壩高、壩長、壩寬</label>
+            <label><input type="checkbox" /> 盤點下游聚落、橋梁、道路與河床活動</label>
+            <label><input type="checkbox" /> 啟動觀測、警戒、撤離或緊急工程</label>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="ai">
+        <div class="ai-card">
+          <span class="ai-badge">AI</span>
+          <h2>技術分析摘要</h2>
+          <div id="aiSummary"></div>
+        </div>
+      </section>
+    </main>
+
+    <button class="ai-fab" data-page-target="ai">AI</button>
+    <script src="./app.js"></script>
+  </body>
+</html>
