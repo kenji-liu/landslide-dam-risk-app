@@ -32,7 +32,13 @@
         </div>
         <div class="top-actions">
           <span id="dateDisplay"></span>
-          <button id="loadMatayan" type="button">載入馬太鞍案例</button>
+          <label class="case-picker">案例選擇
+            <select id="casePreset">
+              <option value="custom">自訂堰塞湖案件</option>
+              <option value="matayan">馬太鞍溪堰塞湖案例</option>
+            </select>
+          </label>
+          <button id="loadMatayan" type="button">套用選定案例</button>
           <button id="exportData" type="button" class="outline">匯出資料</button>
           <button id="printReport" type="button" class="outline">列印報告</button>
         </div>
@@ -87,30 +93,30 @@
         <form id="assessmentForm" class="form-grid">
           <fieldset>
             <legend>案件資訊</legend>
-            <label>案件名稱<input name="caseName" value="馬太鞍溪堰塞湖" /></label>
-            <label>誘發原因<select name="trigger"><option>降雨</option><option>地震</option><option>土石流</option><option>未知</option></select></label>
-            <label>壩體類型<select name="damType"><option>崩滑型堰塞壩</option><option>土石流型堰塞壩</option><option>複合型</option></select></label>
+            <label>案件名稱<input name="caseName" value="自訂堰塞湖案件" /><small class="field-help">可自行輸入調查案件名稱；若套用案例後仍可改名。</small></label>
+            <label>誘發原因<select name="trigger"><option>降雨</option><option>地震</option><option>土石流</option><option>未知</option></select><small class="field-help">依事件前主要誘因判定，可由雨量、地震報告、航照判釋或現地紀錄確認。</small></label>
+            <label>壩體類型<select name="damType"><option>崩滑型堰塞壩</option><option>土石流型堰塞壩</option><option>複合型</option></select><small class="field-help">依阻塞材料來源判定；大規模崩塌直接入河多屬崩滑型，土石流堆積阻塞則選土石流型。</small></label>
           </fieldset>
           <fieldset>
             <legend>地形與壩體</legend>
-            <label>上游集水區面積 A<sub>D</sub> (m²)<input name="catchmentArea" type="number" value="63230000" min="0" step="1" /></label>
-            <label>崩塌面積 A<sub>L</sub> (m²)<input name="landslideArea" type="number" value="5000000" min="0" step="1" /></label>
-            <label>崩塌體積 V<sub>L</sub> (m³)<input name="landslideVolume" type="number" value="320000000" min="0" step="1" /></label>
-            <label>壩體體積 V<sub>D</sub> (m³)<input name="damVolume" type="number" value="200000000" min="0" step="1" /></label>
-            <label>壩高 H<sub>Dmin</sub> (m)<input name="damHeight" type="number" value="200" min="0" step="0.1" /></label>
-            <label>壩寬 W<sub>D</sub> (m)<input name="damWidth" type="number" value="2300" min="0" step="0.1" /></label>
-            <label>壩長 L<sub>DTop</sub> (m)<input name="damLength" type="number" value="600" min="0" step="0.1" /></label>
-            <label>河床坡降 S (m/m)<input name="channelSlope" type="number" value="0.114" min="0" step="0.001" /></label>
+            <label>上游集水區面積 A<sub>D</sub> (m²)<input name="catchmentArea" type="number" value="0" min="0" step="1" /><small class="field-help">以堰塞壩壩址為出口圈繪上游集水區；可由 DEM/GIS 水文分析取得。</small></label>
+            <label>崩塌面積 A<sub>L</sub> (m²)<input name="landslideArea" type="number" value="0" min="0" step="1" /><small class="field-help">由 UAV 正射、衛星影像或災前災後影像圈繪崩塌裸露範圍。</small></label>
+            <label>崩塌體積 V<sub>L</sub> (m³)<input name="landslideVolume" type="number" value="0" min="0" step="1" /><small class="field-help">優先用 DEM 差分估算；缺資料時可用崩塌面積-體積經驗式初估。</small></label>
+            <label>壩體體積 V<sub>D</sub> (m³)<input name="damVolume" type="number" value="0" min="0" step="1" /><small class="field-help">以壩體範圍與災前災後 DEM 差分估算；影響 DBI 與 AHV 判讀。</small></label>
+            <label>壩高 H<sub>Dmin</sub> (m)<input name="damHeight" type="number" value="0" min="0" step="0.1" /><small class="field-help">取原河床至最低可能溢流點或壩頂控制點高差，為潰壩危險判讀核心參數。</small></label>
+            <label>壩寬 W<sub>D</sub> (m)<input name="damWidth" type="number" value="0" min="0" step="0.1" /><small class="field-help">沿河道橫向阻塞寬度，可由正射影像、DSM 或現地測距取得。</small></label>
+            <label>壩長 L<sub>DTop</sub> (m)<input name="damLength" type="number" value="0" min="0" step="0.1" /><small class="field-help">沿原河道方向量測壩體長度或壩頂長度；用於 AHWL 判別式。</small></label>
+            <label>河床坡降 S (m/m)<input name="channelSlope" type="number" value="0" min="0" step="0.001" /><small class="field-help">取壩址上下游代表河段縱坡，建議以 DEM 或河道剖面估算。</small></label>
           </fieldset>
           <fieldset>
             <legend>蓄水與下游保全</legend>
-            <label>蓄水體積 V<sub>W</sub> (m³)<input name="waterVolume" type="number" value="91000000" min="0" step="1" /></label>
-            <label>潰口高度 H<sub>b</sub> (m)<input name="breachHeight" type="number" value="200" min="0" step="0.1" /></label>
-            <label>潰壩歷時 T<sub>c</sub> (hr)<input name="breachTime" type="number" value="2" min="0.1" step="0.1" /></label>
-            <label>代表河道寬 B<sub>w</sub> (m)<input name="riverWidth" type="number" value="449.5" min="0" step="0.1" /></label>
-            <label>代表流速 v<sub>w</sub> (m/s)<input name="flowVelocity" type="number" value="10" min="0" step="0.1" /></label>
-            <label>保全對象高程差 H<sub>po</sub> (m)<input name="protectedHeight" type="number" value="4.4" min="0" step="0.1" /></label>
-            <label>保全對象條件<select name="exposure"><option value="high">影響潛勢區內有保全對象或重要設施</option><option value="medium">下游有受影響疑慮或河床活動紀錄</option><option value="low">下游無保全對象且人員不易抵達</option></select></label>
+            <label>蓄水體積 V<sub>W</sub> (m³)<input name="waterVolume" type="number" value="0" min="0" step="1" /><small class="field-help">可由水面範圍、水深、DEM 庫容曲線或簡易三角形水體估算。</small></label>
+            <label>潰口高度 H<sub>b</sub> (m)<input name="breachHeight" type="number" value="0" min="0" step="0.1" /><small class="field-help">推估可能潰口底至水面或壩頂高差；若未知可先以壩高保守代入。</small></label>
+            <label>潰壩歷時 T<sub>c</sub> (hr)<input name="breachTime" type="number" value="2" min="0.1" step="0.1" /><small class="field-help">用於三角形單位歷線法；緊急初判可採 1-3 小時情境敏感度檢核。</small></label>
+            <label>代表河道寬 B<sub>w</sub> (m)<input name="riverWidth" type="number" value="0" min="0" step="0.1" /><small class="field-help">選下游保全對象附近代表斷面河寬，供水位抬升初估使用。</small></label>
+            <label>代表流速 v<sub>w</sub> (m/s)<input name="flowVelocity" type="number" value="0" min="0" step="0.1" /><small class="field-help">可由水理模式、坡降粗估或現地經驗設定；影響代表水深 hp。</small></label>
+            <label>保全對象高程差 H<sub>po</sub> (m)<input name="protectedHeight" type="number" value="0" min="0" step="0.1" /><small class="field-help">保全對象地盤或道路高程相對河床之高差，用於判斷是否可能受淹。</small></label>
+            <label>保全對象條件<select name="exposure"><option value="high">影響潛勢區內有保全對象或重要設施</option><option value="medium">下游有受影響疑慮或河床活動紀錄</option><option value="low">下游無保全對象且人員不易抵達</option></select><small class="field-help">依聚落、道路、橋梁、管線、河床活動與管制可及性判定。</small></label>
           </fieldset>
         </form>
       </section>

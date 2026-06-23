@@ -138,6 +138,7 @@ function compute() {
   const qpUnitHydrograph = TcHr > 0 ? (2 * VW) / (TcHr * 3600) : NaN;
   const qpSelected = Math.max(qpCosta, qpHeightVolume, qpCenderelli, qpUnitHydrograph);
   const waterDepth = Bw * velocity > 0 ? qpSelected / (Bw * velocity) : NaN;
+  const hasCoreData = AD > 0 && VD > 0 && H > 0 && W > 0 && L > 0 && S > 0 && VW > 0;
 
   const stabilityRows = [
     ["DBI", dbi, dbiClass(dbi), "DBI < 2.75 穩定；DBI > 3.08 不穩定"],
@@ -148,11 +149,11 @@ function compute() {
     ["HDSI", hdsi, hdsiClass(hdsi), "HDSI < 5.74 不穩定；HDSI > 7.44 穩定"]
   ];
 
-  const unstableCount = stabilityRows.filter((row) => row[2] === "不穩定").length;
-  const dangerHigh = unstableCount >= 1 || dbiClass(dbi) === "過渡區";
-  const dangerLevel = dangerHigh ? "較高" : "較低";
-  const exposure = exposureLevel(text("exposure"), waterDepth, Hpo);
-  const risk = riskLevel(dangerHigh, exposure);
+  const unstableCount = hasCoreData ? stabilityRows.filter((row) => row[2] === "不穩定").length : 0;
+  const dangerHigh = hasCoreData ? unstableCount >= 1 || dbiClass(dbi) === "過渡區" : false;
+  const dangerLevel = hasCoreData ? (dangerHigh ? "較高" : "較低") : "待輸入";
+  const exposure = hasCoreData ? exposureLevel(text("exposure"), waterDepth, Hpo) : "待輸入";
+  const risk = hasCoreData ? riskLevel(dangerHigh, exposure) : "待評估";
   const [monitoring, alert, urgency] = recommendationFor(risk);
 
   latest = {
@@ -167,8 +168,8 @@ function compute() {
 
   renderCards([
     ["案件", latest.caseName, latest.damType, "neutral"],
-    ["潰壩危險度", dangerLevel, `${unstableCount} 項不穩定指標`, tagClass(dangerLevel)],
-    ["保全危害度", exposure, `估算水深 ${fmt(waterDepth, 1)} m`, tagClass(exposure)],
+    ["潰壩危險度", dangerLevel, hasCoreData ? `${unstableCount} 項不穩定指標` : "請先輸入壩體參數", tagClass(dangerLevel)],
+    ["保全危害度", exposure, hasCoreData ? `估算水深 ${fmt(waterDepth, 1)} m` : "請先輸入蓄水與下游參數", tagClass(exposure)],
     ["致災風險", risk, `工程急迫性：${urgency}`, tagClass(risk)]
   ]);
 
@@ -215,16 +216,25 @@ function renderRiskMatrix(exposure, dangerHigh) {
   const activeCell = document.querySelector(`[data-cell="${exposureKey}-${dangerKey}"]`);
   if (activeCell) activeCell.classList.add("active");
 
-  recommendation.innerHTML = `
-    <h4>${latest.risk}：${latest.caseName}</h4>
-    <p>誘發原因為「${latest.trigger}」，目前以「${latest.damType}」進行緊急初判。建議採取 <b>${latest.monitoring}</b>，警戒作為為 <b>${latest.alert}</b>，工程急迫性評估為 <b>${latest.urgency}</b>。</p>
-    <p>若 DBI 雖顯示穩定，但 AHWL 或其他指標出現不穩定，應保守納入較高潰壩危險度，並同步檢討滲流破壞、劇烈溢流沖刷與下游複合型土砂災害。</p>
-  `;
+  if (latest.risk === "待評估") {
+    recommendation.innerHTML = `
+      <h4>待評估：${latest.caseName}</h4>
+      <p>請先輸入壩體幾何、上游集水區、河床坡降、蓄水體積與下游代表斷面等核心資料，再進行潰壩危險度與保全危害度判讀。</p>
+    `;
+  } else {
+    recommendation.innerHTML = `
+      <h4>${latest.risk}：${latest.caseName}</h4>
+      <p>誘發原因為「${latest.trigger}」，目前以「${latest.damType}」進行緊急初判。建議採取 <b>${latest.monitoring}</b>，警戒作為為 <b>${latest.alert}</b>，工程急迫性評估為 <b>${latest.urgency}</b>。</p>
+      <p>若 DBI 雖顯示穩定，但 AHWL 或其他指標出現不穩定，應保守納入較高潰壩危險度，並同步檢討滲流破壞、劇烈溢流沖刷與下游複合型土砂災害。</p>
+    `;
+  }
 }
 
 function renderDashboard() {
   document.querySelector("#caseHeadline").textContent = latest.caseName;
-  document.querySelector("#caseLead").textContent = `${latest.trigger}誘發之${latest.damType}，上游集水區面積 ${fmt(latest.AD / 1_000_000, 1)} km²，壩高 ${fmt(latest.H, 0)} m，蓄水體積 ${fmt(latest.VW / 1_000_000, 1)} 百萬 m³。`;
+  document.querySelector("#caseLead").textContent = latest.AD > 0
+    ? `${latest.trigger}誘發之${latest.damType}，上游集水區面積 ${fmt(latest.AD / 1_000_000, 1)} km²，壩高 ${fmt(latest.H, 0)} m，蓄水體積 ${fmt(latest.VW / 1_000_000, 1)} 百萬 m³。`
+    : "請先輸入案件名稱與核心調查參數，或從右上角案例選擇套用馬太鞍溪堰塞湖案例。";
   document.querySelector("#riskStamp").textContent = latest.risk;
   document.querySelector("#surveyProgress").style.width = `${surveyCompleteness()}%`;
 
@@ -237,6 +247,28 @@ function renderDashboard() {
 }
 
 function renderExpertFindings() {
+  if (latest.risk === "待評估") {
+    expertFindings.innerHTML = `
+      <article class="finding">
+        <strong>1. 先建立案件名稱</strong>
+        <p>可自行輸入任一堰塞湖名稱；馬太鞍溪僅作為示範案例，可由右上角案例選擇套用。</p>
+      </article>
+      <article class="finding">
+        <strong>2. 先補齊核心參數</strong>
+        <p>至少需壩體高度、長度、寬度、壩體體積、上游集水區、河床坡降與蓄水體積，才能進行安定性初判。</p>
+      </article>
+      <article class="finding">
+        <strong>3. 再判斷潰壩情境</strong>
+        <p>輸入資料後系統會交叉檢核 DBI、AHV、AHWL 與 HDSI，並提出保守潰壩型態情境。</p>
+      </article>
+      <article class="finding">
+        <strong>4. 最後確認保全對象</strong>
+        <p>下游河寬、流速與保全對象高程差會影響水位初估與撤離警戒建議。</p>
+      </article>
+    `;
+    return;
+  }
+
   const stabilityView = latest.unstableCount > 0
     ? `DBI 與 HDSI 需搭配 AHWL/AHV 判別式交叉檢核；目前已有 ${latest.unstableCount} 項指標指向不穩定，壩體破壞機制不宜只以單一穩定指標下結論。`
     : "目前主要安定性指標未顯示明確不穩定，但仍需持續追蹤水位、壩頂溢流與滲流跡象。";
@@ -304,6 +336,18 @@ function loadPreset(preset) {
   compute();
 }
 
+function loadCustomBlank() {
+  Object.keys(matayanPreset).forEach((key) => {
+    if (!form.elements[key]) return;
+    if (form.elements[key].type === "number") form.elements[key].value = key === "breachTime" ? 2 : 0;
+    else if (key === "caseName") form.elements[key].value = "自訂堰塞湖案件";
+  });
+  form.elements.trigger.value = "降雨";
+  form.elements.damType.value = "崩滑型堰塞壩";
+  form.elements.exposure.value = "medium";
+  compute();
+}
+
 function showPage(pageId) {
   document.querySelectorAll(".page").forEach((page) => page.classList.toggle("active", page.id === pageId));
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.page === pageId));
@@ -335,13 +379,18 @@ document.querySelectorAll(".nav-item").forEach((item) => {
 document.querySelector(".ai-fab").addEventListener("click", () => showPage("ai"));
 form.addEventListener("input", compute);
 form.addEventListener("change", compute);
-document.querySelector("#loadMatayan").addEventListener("click", () => loadPreset(matayanPreset));
+document.querySelector("#loadMatayan").addEventListener("click", () => {
+  const preset = document.querySelector("#casePreset").value;
+  if (preset === "matayan") loadPreset(matayanPreset);
+  else loadCustomBlank();
+});
+document.querySelector("#casePreset").addEventListener("change", (event) => {
+  if (event.target.value === "matayan") loadPreset(matayanPreset);
+  else loadCustomBlank();
+});
 document.querySelector("#clearForm").addEventListener("click", () => {
-  form.reset();
-  [...form.elements].forEach((el) => {
-    if (el.type === "number" || el.tagName === "INPUT") el.value = "";
-  });
-  compute();
+  document.querySelector("#casePreset").value = "custom";
+  loadCustomBlank();
 });
 document.querySelector("#printReport").addEventListener("click", () => {
   showPage("report");

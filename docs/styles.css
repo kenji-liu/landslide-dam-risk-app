@@ -146,6 +146,21 @@ h1 {
   gap: 10px;
 }
 
+.case-picker {
+  display: grid;
+  gap: 3px;
+  min-width: 180px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.case-picker select {
+  min-height: 38px;
+  border-color: #bfd5e6;
+  background: #f8fcff;
+}
+
 #dateDisplay {
   color: var(--muted);
   font-size: 14px;
@@ -468,6 +483,13 @@ label {
   color: #263b53;
   font-size: 14px;
   font-weight: 800;
+}
+
+.field-help {
+  color: #70869a;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 input, select, textarea {
