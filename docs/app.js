@@ -11,6 +11,7 @@ const pageTitles = {
   dashboard: "專家總覽",
   survey: "調查參數",
   risk: "風險演算",
+  figures: "示意圖庫",
   gis: "空間研判",
   report: "通報報告",
   ai: "專家摘要"

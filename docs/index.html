@@ -18,6 +18,7 @@
       <button class="nav-item active" data-page="dashboard"><span>▦</span> 專家總覽</button>
       <button class="nav-item" data-page="survey"><span>▣</span> 調查參數</button>
       <button class="nav-item" data-page="risk"><span>▤</span> 風險演算</button>
+      <button class="nav-item" data-page="figures"><span>圖</span> 示意圖庫</button>
       <button class="nav-item" data-page="gis"><span>◎</span> 空間研判</button>
       <button class="nav-item" data-page="report"><span>▨</span> 通報報告</button>
       <button class="nav-item" data-page="ai"><span>AI</span> 專家摘要</button>
@@ -90,6 +91,20 @@
           </div>
           <button id="clearForm" type="button" class="outline">清空輸入</button>
         </div>
+        <section class="figure-strip">
+          <article class="figure-card">
+            <img src="./assets/figures/dam-parameter-definition.png" alt="崩滑型堰塞壩參數定義示意圖" />
+            <div><strong>崩滑型堰塞壩參數定義</strong><p>對照壩高、壩頂長、壩底寬、蓄水面積與滿水位等調查欄位。</p></div>
+          </article>
+          <article class="figure-card">
+            <img src="./assets/figures/landslide-dam-geometry.png" alt="大規模崩塌與堰塞壩幾何參數示意圖" />
+            <div><strong>崩塌與壩體幾何</strong><p>協助判讀崩塌面積、崩塌體積、壩體高度、寬度與長度量測位置。</p></div>
+          </article>
+          <article class="figure-card">
+            <img src="./assets/figures/lake-profile-parameters.png" alt="堰塞湖與沿河道剖面參數示意圖" />
+            <div><strong>堰塞湖與剖面參數</strong><p>用於理解蓄水面積、蓄水體積、河道縱坡與沿河道方向剖面。</p></div>
+          </article>
+        </section>
         <form id="assessmentForm" class="form-grid">
           <fieldset>
             <legend>案件資訊</legend>
@@ -122,6 +137,20 @@
       </section>
 
       <section class="page" id="risk">
+        <section class="figure-strip risk-figures">
+          <article class="figure-card">
+            <img src="./assets/figures/dbi-stability-index.png" alt="DBI 無因次阻塞指標示意圖" />
+            <div><strong>DBI 無因次阻塞指標</strong><p>說明上游集水區、壩高與壩體體積如何共同影響安定性初判。</p></div>
+          </article>
+          <article class="figure-card">
+            <img src="./assets/figures/storage-breach-geometry.png" alt="壩體規模與最大蓄水量幾何示意圖" />
+            <div><strong>壩體規模與最大蓄水量</strong><p>提供壩體體積、最大蓄水深、河道幾何與潰口情境的概念對照。</p></div>
+          </article>
+          <article class="figure-card">
+            <img src="./assets/figures/risk-matrix-action.png" alt="堰塞湖致災風險初步評估矩陣示意圖" />
+            <div><strong>致災風險矩陣</strong><p>對照潰壩危險度、保全危害度、觀測、警戒與工程急迫性建議。</p></div>
+          </article>
+        </section>
         <div class="result-grid">
           <article class="module-card">
             <h2>安定性評估</h2>
@@ -142,6 +171,23 @@
           </div>
           <div id="recommendation" class="recommendation"></div>
         </article>
+      </section>
+
+      <section class="page" id="figures">
+        <div class="toolbar-card">
+          <div>
+            <h2>示意圖庫</h2>
+            <p>以下示意圖選自「02.堰塞湖緊急調查與風險評估(初稿)_20260622_v2.pdf」，供填表與判讀時快速對照。</p>
+          </div>
+        </div>
+        <div class="figure-gallery">
+          <article class="gallery-card"><img src="./assets/figures/dam-parameter-definition.png" alt="崩滑型堰塞壩參數定義" /><h3>崩滑型堰塞壩參數定義</h3><p>頁 19：壩體、蓄水位與剖面參數。</p></article>
+          <article class="gallery-card"><img src="./assets/figures/landslide-dam-geometry.png" alt="崩塌與壩體幾何參數" /><h3>崩塌與壩體幾何參數</h3><p>頁 20：崩塌土體與堰塞壩量測項目。</p></article>
+          <article class="gallery-card"><img src="./assets/figures/lake-profile-parameters.png" alt="堰塞湖與沿河道剖面參數" /><h3>堰塞湖與沿河道剖面參數</h3><p>頁 21：蓄水與沿河道方向剖面。</p></article>
+          <article class="gallery-card"><img src="./assets/figures/dbi-stability-index.png" alt="DBI 安定性指標" /><h3>DBI 安定性指標</h3><p>頁 27：無因次阻塞指標與穩定/不穩定區間。</p></article>
+          <article class="gallery-card"><img src="./assets/figures/storage-breach-geometry.png" alt="壩體規模與最大蓄水量" /><h3>壩體規模與最大蓄水量</h3><p>頁 30：壩體幾何與最大蓄水深推估。</p></article>
+          <article class="gallery-card"><img src="./assets/figures/risk-matrix-action.png" alt="致災風險矩陣與處置建議" /><h3>致災風險矩陣與處置建議</h3><p>頁 38：致災風險等級與應變建議。</p></article>
+        </div>
       </section>
 
       <section class="page" id="gis">

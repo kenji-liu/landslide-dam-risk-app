@@ -453,6 +453,74 @@ button.outline {
 
 .toolbar-card p { margin-bottom: 0; color: var(--muted); }
 
+.figure-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.figure-card,
+.gallery-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.figure-card img,
+.gallery-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #f6fbff;
+  border-bottom: 1px solid var(--line);
+}
+
+.figure-card div {
+  padding: 12px 14px 14px;
+}
+
+.figure-card strong,
+.gallery-card h3 {
+  display: block;
+  margin: 0 0 5px;
+  color: #173e56;
+}
+
+.figure-card p,
+.gallery-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.risk-figures {
+  margin-bottom: 16px;
+}
+
+.figure-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.gallery-card h3,
+.gallery-card p {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.gallery-card h3 {
+  padding-top: 14px;
+}
+
+.gallery-card p {
+  padding-bottom: 16px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -723,7 +791,7 @@ input, select, textarea {
   .nav-item span { font-size: 16px; }
   .sidebar-footer { display: none; }
   .main-content { margin-left: 78px; }
-  .cards, .module-grid, .result-grid, .gis-layout, .steps { grid-template-columns: 1fr 1fr; }
+  .cards, .module-grid, .result-grid, .gis-layout, .steps, .figure-strip, .figure-gallery { grid-template-columns: 1fr 1fr; }
   .expert-panel { grid-template-columns: 1fr; }
   .expert-heading { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 14px; }
   fieldset { grid-template-columns: 1fr 1fr; }
@@ -747,7 +815,7 @@ input, select, textarea {
     display: grid;
     align-items: stretch;
   }
-  .cards, .module-grid, .result-grid, .gis-layout, .steps, fieldset {
+  .cards, .module-grid, .result-grid, .gis-layout, .steps, fieldset, .figure-strip, .figure-gallery {
     grid-template-columns: 1fr;
   }
   .expert-findings { grid-template-columns: 1fr; }
