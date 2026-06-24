@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -194,26 +195,66 @@
         <div class="toolbar-card">
           <div>
             <h2>空間研判</h2>
-            <p>以堰塞壩、蓄水區、潰決洪水廊道與保全對象為主圖層，輔助專家判斷下游暴露程度。</p>
+            <p>套疊真實衛星影像後圈繪崩塌與壩體範圍，依專家量測準則推估 AL、VL、VD、HDmin、WD、LDTop 與 S。</p>
           </div>
-          <button class="outline" type="button">匯入圖層</button>
+          <div class="toolbar-actions">
+            <button id="focusMatayan" class="outline" type="button">定位馬太鞍案例</button>
+            <button id="applySpatialEstimates" type="button">回填量測參數</button>
+          </div>
         </div>
-        <div class="gis-layout">
-          <div class="map-board">
-            <span class="map-label dam">天然壩體</span>
-            <span class="map-label lake">堰塞湖蓄水範圍</span>
-            <span class="map-label village">下游保全聚落</span>
-            <span class="map-label route">撤離路線</span>
+        <div class="gis-layout spatial-workspace">
+          <div class="satellite-panel">
+            <div id="satelliteMap" class="satellite-map" aria-label="衛星影像量測地圖"></div>
+            <div id="mapStatus" class="map-status">載入衛星底圖中...</div>
           </div>
           <div class="layer-panel">
-            <h3>圖層清單</h3>
-            <label><input type="checkbox" checked /> UAV 正射影像</label>
-            <label><input type="checkbox" checked /> DEM 差分壩體範圍</label>
-            <label><input type="checkbox" checked /> 下游洪水影響廊道</label>
-            <label><input type="checkbox" checked /> 保全對象與橋梁道路</label>
-            <label><input type="checkbox" /> Sentinel-2 變異偵測</label>
+            <h3>衛星底圖與量測</h3>
+            <label>底圖來源
+              <select id="basemapSelect">
+                <option value="satellite">Esri World Imagery 衛星影像</option>
+                <option value="osm">OpenStreetMap 地名道路</option>
+              </select>
+            </label>
+            <div class="measure-tools">
+              <button type="button" class="outline measure-mode active" data-measure-mode="landslide">圈繪崩塌 AL</button>
+              <button type="button" class="outline measure-mode" data-measure-mode="damFootprint">圈繪壩體面積</button>
+              <button type="button" class="outline measure-mode" data-measure-mode="damWidth">量測壩寬 WD</button>
+              <button type="button" class="outline measure-mode" data-measure-mode="damLength">量測壩長 LDTop</button>
+              <button type="button" class="outline measure-mode" data-measure-mode="channelSlope">量測河段長度</button>
+            </div>
+            <div class="measure-actions">
+              <button id="finishMeasurement" type="button">完成量測</button>
+              <button id="clearMeasurement" class="outline" type="button">清除圖形</button>
+            </div>
+            <div class="estimate-inputs">
+              <label>崩塌平均厚度 TL (m)<input id="landslideThickness" type="number" value="64" min="0" step="0.1" /></label>
+              <label>壩頂/溢流點高程 (m)<input id="crestElevation" type="number" placeholder="例：1139" step="0.1" /></label>
+              <label>原河床高程 (m)<input id="riverbedElevation" type="number" placeholder="例：939" step="0.1" /></label>
+              <label>壩體形狀係數<input id="damShapeFactor" type="number" value="0.72" min="0.1" max="1" step="0.01" /></label>
+              <label>上游河床高程 (m)<input id="slopeUpElevation" type="number" placeholder="坡降起點" step="0.1" /></label>
+              <label>下游河床高程 (m)<input id="slopeDownElevation" type="number" placeholder="坡降終點" step="0.1" /></label>
+            </div>
+            <div id="spatialResults" class="spatial-results"></div>
           </div>
         </div>
+        <section class="criteria-grid">
+          <article>
+            <strong>AL 崩塌面積</strong>
+            <p>以災後衛星影像或 UAV 正射圈繪裸露、裂隙擴張與滑動堆積源區；植生或陰影不清處以災前影像比對。</p>
+          </article>
+          <article>
+            <strong>VL 崩塌體積</strong>
+            <p>優先採災前/災後 DEM 差分；緊急階段可用 AL × 平均厚度 TL 初估，並以現地剖面或文獻範圍校核。</p>
+          </article>
+          <article>
+            <strong>VD 壩體體積</strong>
+            <p>圈繪壩體足跡後，以足跡面積 × HDmin × 形狀係數推估；若未圈繪足跡，系統以 WD × LDTop × HDmin × 形狀係數初估。</p>
+          </article>
+          <article>
+            <strong>HDmin 與 S</strong>
+            <p>HDmin 取溢流控制點與原河床高程差；S 取壩址上下游代表河段高程差除以沿河道量測長度。</p>
+          </article>
+        </section>
       </section>
 
       <section class="page" id="report">
@@ -247,6 +288,7 @@
     </main>
 
     <button class="ai-fab" data-page-target="ai">AI</button>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

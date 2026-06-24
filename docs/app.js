@@ -40,6 +40,38 @@ const matayanPreset = {
 
 let latest = {};
 
+const matayanLocation = {
+  name: "馬太鞍溪堰塞湖",
+  lat: 23.6995,
+  lng: 121.2955,
+  zoom: 15
+};
+
+const measureMeta = {
+  landslide: { label: "崩塌面積 AL", type: "polygon", minPoints: 3, color: "#c85252" },
+  damFootprint: { label: "壩體足跡面積", type: "polygon", minPoints: 3, color: "#d98933" },
+  damWidth: { label: "壩寬 WD", type: "line", minPoints: 2, color: "#2f80c2" },
+  damLength: { label: "壩長 LDTop", type: "line", minPoints: 2, color: "#3a9b73" },
+  channelSlope: { label: "代表河段長度", type: "line", minPoints: 2, color: "#7b6fd6" }
+};
+
+const spatialState = {
+  map: null,
+  baseLayers: {},
+  activeBaseLayer: null,
+  activeMode: "landslide",
+  currentPoints: [],
+  currentLayer: null,
+  drawnLayers: [],
+  result: {
+    landslideArea: 0,
+    damFootprintArea: 0,
+    damWidth: 0,
+    damLength: 0,
+    channelSlopeDistance: 0
+  }
+};
+
 function svgShell(title, inner) {
   return `
     <span class="param-sketch" aria-label="${title}">
@@ -200,6 +232,234 @@ function fmt(value, digits = 2) {
     maximumFractionDigits: digits,
     minimumFractionDigits: digits
   });
+}
+
+function fmtCompact(value, digits = 0, unit = "") {
+  if (!Number.isFinite(value) || value <= 0) return "尚未量測";
+  return `${value.toLocaleString("zh-TW", { maximumFractionDigits: digits })}${unit}`;
+}
+
+function getInputNumber(id) {
+  const el = document.querySelector(`#${id}`);
+  if (!el) return 0;
+  const value = Number(el.value);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function setMapStatus(message) {
+  const status = document.querySelector("#mapStatus");
+  if (status) status.textContent = message;
+}
+
+function polygonArea(latlngs) {
+  if (!latlngs || latlngs.length < 3) return 0;
+  const earthRadius = 6378137;
+  let area = 0;
+  for (let i = 0; i < latlngs.length; i += 1) {
+    const p1 = latlngs[i];
+    const p2 = latlngs[(i + 1) % latlngs.length];
+    const lon1 = p1.lng * Math.PI / 180;
+    const lon2 = p2.lng * Math.PI / 180;
+    const lat1 = p1.lat * Math.PI / 180;
+    const lat2 = p2.lat * Math.PI / 180;
+    area += (lon2 - lon1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+  }
+  return Math.abs(area * earthRadius * earthRadius / 2);
+}
+
+function lineDistance(latlngs) {
+  if (!spatialState.map || !latlngs || latlngs.length < 2) return 0;
+  let distance = 0;
+  for (let i = 1; i < latlngs.length; i += 1) {
+    distance += spatialState.map.distance(latlngs[i - 1], latlngs[i]);
+  }
+  return distance;
+}
+
+function getSpatialEstimates() {
+  const AL = spatialState.result.landslideArea;
+  const damFootprint = spatialState.result.damFootprintArea;
+  const WD = spatialState.result.damWidth;
+  const LDTop = spatialState.result.damLength;
+  const slopeDistance = spatialState.result.channelSlopeDistance;
+  const landslideThickness = getInputNumber("landslideThickness");
+  const crestElevation = getInputNumber("crestElevation");
+  const riverbedElevation = getInputNumber("riverbedElevation");
+  const slopeUpElevation = getInputNumber("slopeUpElevation");
+  const slopeDownElevation = getInputNumber("slopeDownElevation");
+  const shapeFactor = getInputNumber("damShapeFactor") || 0.72;
+  const HDmin = crestElevation > 0 && riverbedElevation > 0 ? Math.max(0, crestElevation - riverbedElevation) : num("damHeight");
+  const VL = AL > 0 && landslideThickness > 0 ? AL * landslideThickness : 0;
+  const inferredDamFootprint = damFootprint > 0 ? damFootprint : WD * LDTop;
+  const VD = inferredDamFootprint > 0 && HDmin > 0 ? inferredDamFootprint * HDmin * shapeFactor : 0;
+  const S = slopeDistance > 0 && slopeUpElevation > 0 && slopeDownElevation > 0
+    ? Math.abs(slopeUpElevation - slopeDownElevation) / slopeDistance
+    : 0;
+
+  return { AL, VL, VD, HDmin, WD, LDTop, S, damFootprint, slopeDistance, shapeFactor, landslideThickness };
+}
+
+function renderSpatialResults() {
+  const container = document.querySelector("#spatialResults");
+  if (!container) return;
+  const estimate = getSpatialEstimates();
+  container.innerHTML = `
+    <div class="spatial-result"><strong>AL</strong><span>${fmtCompact(estimate.AL, 0, " m²")}</span></div>
+    <div class="spatial-result"><strong>VL</strong><span>${fmtCompact(estimate.VL, 0, " m³")}</span></div>
+    <div class="spatial-result"><strong>VD</strong><span>${fmtCompact(estimate.VD, 0, " m³")}</span></div>
+    <div class="spatial-result"><strong>HDmin</strong><span>${fmtCompact(estimate.HDmin, 1, " m")}</span></div>
+    <div class="spatial-result"><strong>WD</strong><span>${fmtCompact(estimate.WD, 1, " m")}</span></div>
+    <div class="spatial-result"><strong>LDTop</strong><span>${fmtCompact(estimate.LDTop, 1, " m")}</span></div>
+    <div class="spatial-result"><strong>S</strong><span>${fmtCompact(estimate.S, 4, " m/m")}</span></div>
+  `;
+}
+
+function resetCurrentMeasurement() {
+  if (spatialState.currentLayer && spatialState.map) spatialState.map.removeLayer(spatialState.currentLayer);
+  spatialState.currentPoints = [];
+  spatialState.currentLayer = null;
+}
+
+function drawCurrentMeasurement() {
+  if (!spatialState.map) return;
+  if (spatialState.currentLayer) spatialState.map.removeLayer(spatialState.currentLayer);
+  const meta = measureMeta[spatialState.activeMode];
+  if (!meta || spatialState.currentPoints.length === 0) return;
+  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.22 };
+  if (meta.type === "polygon" && spatialState.currentPoints.length >= 3) {
+    spatialState.currentLayer = L.polygon(spatialState.currentPoints, options).addTo(spatialState.map);
+  } else {
+    spatialState.currentLayer = L.polyline(spatialState.currentPoints, options).addTo(spatialState.map);
+  }
+}
+
+function finishMeasurement() {
+  if (!spatialState.map) return;
+  const meta = measureMeta[spatialState.activeMode];
+  if (!meta || spatialState.currentPoints.length < meta.minPoints) {
+    setMapStatus(`${meta ? meta.label : "量測"} 至少需要 ${meta ? meta.minPoints : 2} 個點。`);
+    return;
+  }
+
+  const points = [...spatialState.currentPoints];
+  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.26 };
+  let value = 0;
+  let layer;
+  if (meta.type === "polygon") {
+    value = polygonArea(points);
+    layer = L.polygon(points, options).addTo(spatialState.map);
+    if (spatialState.activeMode === "landslide") spatialState.result.landslideArea = value;
+    if (spatialState.activeMode === "damFootprint") spatialState.result.damFootprintArea = value;
+  } else {
+    value = lineDistance(points);
+    layer = L.polyline(points, options).addTo(spatialState.map);
+    if (spatialState.activeMode === "damWidth") spatialState.result.damWidth = value;
+    if (spatialState.activeMode === "damLength") spatialState.result.damLength = value;
+    if (spatialState.activeMode === "channelSlope") spatialState.result.channelSlopeDistance = value;
+  }
+  layer.bindPopup(`<div class="spatial-popup"><b>${meta.label}</b><span>${meta.type === "polygon" ? fmtCompact(value, 0, " m²") : fmtCompact(value, 1, " m")}</span></div>`);
+  spatialState.drawnLayers.push(layer);
+  resetCurrentMeasurement();
+  renderSpatialResults();
+  setMapStatus(`已完成 ${meta.label}：${meta.type === "polygon" ? fmtCompact(value, 0, " m²") : fmtCompact(value, 1, " m")}。可繼續切換其他量測項目。`);
+}
+
+function setMeasurementMode(mode) {
+  if (!measureMeta[mode]) return;
+  spatialState.activeMode = mode;
+  resetCurrentMeasurement();
+  document.querySelectorAll(".measure-mode").forEach((button) => {
+    button.classList.toggle("active", button.dataset.measureMode === mode);
+  });
+  const meta = measureMeta[mode];
+  setMapStatus(`${meta.label}：在衛星影像上連續點選，完成後按「完成量測」。`);
+}
+
+function clearSpatialMeasurements() {
+  resetCurrentMeasurement();
+  spatialState.drawnLayers.forEach((layer) => spatialState.map && spatialState.map.removeLayer(layer));
+  spatialState.drawnLayers = [];
+  spatialState.result = {
+    landslideArea: 0,
+    damFootprintArea: 0,
+    damWidth: 0,
+    damLength: 0,
+    channelSlopeDistance: 0
+  };
+  renderSpatialResults();
+  setMapStatus("已清除量測圖形。請重新選擇量測項目後點選地圖。");
+}
+
+function applySpatialEstimates() {
+  const estimate = getSpatialEstimates();
+  const mapping = [
+    ["landslideArea", estimate.AL],
+    ["landslideVolume", estimate.VL],
+    ["damVolume", estimate.VD],
+    ["damHeight", estimate.HDmin],
+    ["damWidth", estimate.WD],
+    ["damLength", estimate.LDTop],
+    ["channelSlope", estimate.S]
+  ];
+  mapping.forEach(([field, value]) => {
+    if (form.elements[field] && Number.isFinite(value) && value > 0) {
+      form.elements[field].value = field === "channelSlope" ? value.toFixed(4) : value.toFixed(field === "damHeight" || field === "damWidth" || field === "damLength" ? 1 : 0);
+    }
+  });
+  compute();
+  setMapStatus("已將可推估的空間量測成果回填到調查參數。請檢核厚度、高程與形狀係數是否符合現地資料。");
+}
+
+function addMatayanReference() {
+  if (!spatialState.map || !window.L) return;
+  spatialState.map.setView([matayanLocation.lat, matayanLocation.lng], matayanLocation.zoom);
+  const marker = L.marker([matayanLocation.lat, matayanLocation.lng]).addTo(spatialState.map);
+  marker.bindPopup(`
+    <div class="spatial-popup">
+      <b>${matayanLocation.name}</b>
+      <span>公開座標：23.6995, 121.2955</span>
+      <span>案例值可由右上角「馬太鞍溪堰塞湖案例」套用。</span>
+    </div>
+  `).openPopup();
+  spatialState.drawnLayers.push(marker);
+  spatialState.result.landslideArea = matayanPreset.landslideArea;
+  spatialState.result.damWidth = matayanPreset.damWidth;
+  spatialState.result.damLength = matayanPreset.damLength;
+  spatialState.result.channelSlopeDistance = 1000;
+  document.querySelector("#crestElevation").value = 1139;
+  document.querySelector("#riverbedElevation").value = 939;
+  document.querySelector("#slopeUpElevation").value = 1053;
+  document.querySelector("#slopeDownElevation").value = 939;
+  renderSpatialResults();
+  setMapStatus("已定位馬太鞍溪堰塞湖，並載入案例參考值。若要作為正式成果，請以最新影像重新圈繪。");
+}
+
+function initSpatialMap() {
+  const mapEl = document.querySelector("#satelliteMap");
+  if (!mapEl) return;
+  renderSpatialResults();
+  if (!window.L) {
+    setMapStatus("無法載入線上地圖元件。請確認可連線到 Leaflet CDN 後重新整理。");
+    return;
+  }
+  spatialState.map = L.map(mapEl, { doubleClickZoom: false }).setView([matayanLocation.lat, matayanLocation.lng], matayanLocation.zoom);
+  spatialState.baseLayers.satellite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19,
+    attribution: "Tiles &copy; Esri"
+  });
+  spatialState.baseLayers.osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors"
+  });
+  spatialState.activeBaseLayer = spatialState.baseLayers.satellite.addTo(spatialState.map);
+  spatialState.map.on("click", (event) => {
+    spatialState.currentPoints.push(event.latlng);
+    drawCurrentMeasurement();
+    const meta = measureMeta[spatialState.activeMode];
+    setMapStatus(`${meta.label} 已點選 ${spatialState.currentPoints.length} 點；完成後按「完成量測」。`);
+  });
+  spatialState.map.on("dblclick", finishMeasurement);
+  setMeasurementMode("landslide");
 }
 
 function tagClass(level) {
@@ -494,6 +754,9 @@ function showPage(pageId) {
   document.querySelectorAll(".page").forEach((page) => page.classList.toggle("active", page.id === pageId));
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.page === pageId));
   document.querySelector("#pageTitle").textContent = pageTitles[pageId] || "案件儀表板";
+  if (pageId === "gis" && spatialState.map) {
+    setTimeout(() => spatialState.map.invalidateSize(), 120);
+  }
 }
 
 function exportData() {
@@ -544,6 +807,24 @@ document.querySelector("#copyReport").addEventListener("click", async () => {
   document.querySelector("#copyReport").textContent = "已複製";
   setTimeout(() => (document.querySelector("#copyReport").textContent = "複製摘要"), 1200);
 });
+document.querySelectorAll(".measure-mode").forEach((button) => {
+  button.addEventListener("click", () => setMeasurementMode(button.dataset.measureMode));
+});
+document.querySelector("#finishMeasurement").addEventListener("click", finishMeasurement);
+document.querySelector("#clearMeasurement").addEventListener("click", clearSpatialMeasurements);
+document.querySelector("#applySpatialEstimates").addEventListener("click", applySpatialEstimates);
+document.querySelector("#focusMatayan").addEventListener("click", addMatayanReference);
+document.querySelector("#basemapSelect").addEventListener("change", (event) => {
+  if (!spatialState.map) return;
+  if (spatialState.activeBaseLayer) spatialState.map.removeLayer(spatialState.activeBaseLayer);
+  spatialState.activeBaseLayer = spatialState.baseLayers[event.target.value].addTo(spatialState.map);
+  setMapStatus(event.target.value === "satellite" ? "已切換為衛星影像底圖。" : "已切換為道路地名底圖。");
+});
+["landslideThickness", "crestElevation", "riverbedElevation", "damShapeFactor", "slopeUpElevation", "slopeDownElevation"].forEach((id) => {
+  const input = document.querySelector(`#${id}`);
+  if (input) input.addEventListener("input", renderSpatialResults);
+});
 
 addParameterSketches();
+initSpatialMap();
 compute();
