@@ -397,7 +397,7 @@ function finishMeasurement() {
   spatialState.drawnLayers.push(layer);
   resetCurrentMeasurement();
   renderSpatialResults();
-  setMapStatus(`已完成 ${meta.label}：${meta.type === "polygon" ? fmtCompact(value, 0, " m²") : fmtCompact(value, 1, " m")}。可繼續切換其他量測項目。`);
+  autoImportSpatialEstimates(`已完成 ${meta.label}：${meta.type === "polygon" ? fmtCompact(value, 0, " m²") : fmtCompact(value, 1, " m")}，`);
 }
 
 function setMeasurementMode(mode) {
@@ -427,7 +427,8 @@ function clearSpatialMeasurements() {
   setMapStatus("已清除量測圖形。請重新選擇量測項目後點選地圖。");
 }
 
-function applySpatialEstimates() {
+function syncSpatialEstimatesToForm(options = {}) {
+  const { force = false } = options;
   const estimate = getSpatialEstimates();
   const mapping = [
     ["landslideArea", estimate.AL],
@@ -438,13 +439,35 @@ function applySpatialEstimates() {
     ["damLength", estimate.LDTop],
     ["channelSlope", estimate.S]
   ];
+  let synced = 0;
   mapping.forEach(([field, value]) => {
     if (form.elements[field] && Number.isFinite(value) && value > 0) {
-      form.elements[field].value = field === "channelSlope" ? value.toFixed(4) : value.toFixed(field === "damHeight" || field === "damWidth" || field === "damLength" ? 1 : 0);
+      const current = Number(form.elements[field].value);
+      const next = field === "channelSlope" ? value.toFixed(4) : value.toFixed(field === "damHeight" || field === "damWidth" || field === "damLength" ? 1 : 0);
+      if (force || !Number.isFinite(current) || current <= 0 || form.elements[field].value !== next) {
+        form.elements[field].value = next;
+        synced += 1;
+      }
     }
   });
-  compute();
-  setMapStatus("已將可推估的空間量測成果回填到調查參數。請檢核厚度、高程與形狀係數是否符合現地資料。");
+  if (synced > 0) compute();
+  return synced;
+}
+
+function autoImportSpatialEstimates(reason = "空間量測") {
+  const synced = syncSpatialEstimatesToForm();
+  if (synced > 0) {
+    setMapStatus(`${reason}已直接匯入調查參數，共更新 ${synced} 個欄位。請檢核厚度、高程與形狀係數是否符合現地資料。`);
+  }
+}
+
+function applySpatialEstimates() {
+  const synced = syncSpatialEstimatesToForm({ force: true });
+  if (synced > 0) {
+    setMapStatus(`已同步至調查參數，共更新 ${synced} 個欄位。請檢核厚度、高程與形狀係數是否符合現地資料。`);
+  } else {
+    setMapStatus("目前尚無可同步的空間量測成果；請先圈繪或輸入高程、厚度與形狀係數。");
+  }
 }
 
 function addMatayanReference() {
@@ -468,7 +491,8 @@ function addMatayanReference() {
   document.querySelector("#slopeUpElevation").value = 1053;
   document.querySelector("#slopeDownElevation").value = 939;
   renderSpatialResults();
-  setMapStatus("已定位馬太鞍溪堰塞湖，並載入案例參考值。若要作為正式成果，請以最新影像重新圈繪。");
+  autoImportSpatialEstimates("馬太鞍溪案例參考值");
+  setMapStatus("已定位馬太鞍溪堰塞湖，並將案例參考值直接匯入調查參數。若要作為正式成果，請以最新影像重新圈繪。");
 }
 
 function initSpatialMap() {
@@ -810,6 +834,11 @@ function exportData() {
   URL.revokeObjectURL(a.href);
 }
 
+function handleSpatialEstimateInput() {
+  renderSpatialResults();
+  autoImportSpatialEstimates("推估條件調整後，");
+}
+
 document.querySelector("#dateDisplay").textContent = new Date().toLocaleDateString("zh-TW", {
   year: "numeric", month: "long", day: "numeric", weekday: "short"
 });
@@ -859,7 +888,7 @@ document.querySelector("#basemapSelect").addEventListener("change", (event) => {
 });
 ["landslideThickness", "crestElevation", "riverbedElevation", "damShapeFactor", "slopeUpElevation", "slopeDownElevation"].forEach((id) => {
   const input = document.querySelector(`#${id}`);
-  if (input) input.addEventListener("input", renderSpatialResults);
+  if (input) input.addEventListener("input", handleSpatialEstimateInput);
 });
 
 addParameterSketches();

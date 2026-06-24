@@ -199,7 +199,7 @@
           </div>
           <div class="toolbar-actions">
             <button id="focusMatayan" class="outline" type="button">定位馬太鞍案例</button>
-            <button id="applySpatialEstimates" type="button">回填量測參數</button>
+            <button id="applySpatialEstimates" type="button">同步至調查參數</button>
           </div>
         </div>
         <div class="gis-layout spatial-workspace">
@@ -235,6 +235,7 @@
               <label>上游河床高程 (m)<input id="slopeUpElevation" type="number" placeholder="坡降起點" step="0.1" /></label>
               <label>下游河床高程 (m)<input id="slopeDownElevation" type="number" placeholder="坡降終點" step="0.1" /></label>
             </div>
+            <p class="sync-note">空間量測成果會直接匯入「調查參數」並更新風險演算；按「同步至調查參數」可手動強制同步一次。</p>
             <div id="spatialResults" class="spatial-results"></div>
           </div>
         </div>
