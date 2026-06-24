@@ -444,7 +444,7 @@ function drawCurrentMeasurement() {
   if (spatialState.currentLayer) spatialState.map.removeLayer(spatialState.currentLayer);
   const meta = measureMeta[spatialState.activeMode];
   if (!meta || meta.type === "point" || spatialState.currentPoints.length === 0) return;
-  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.22, bubblingMouseEvents: false };
+  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.22, interactive: false };
   if (meta.type === "polygon" && spatialState.currentPoints.length >= 3) {
     spatialState.currentLayer = L.polygon(spatialState.currentPoints, options).addTo(spatialState.map);
   } else {
@@ -465,7 +465,7 @@ function finishMeasurement() {
   }
 
   const points = [...spatialState.currentPoints];
-  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.26, bubblingMouseEvents: false };
+  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.26, interactive: false };
   let value = 0;
   let layer;
   if (meta.type === "polygon") {
@@ -481,7 +481,7 @@ function finishMeasurement() {
     if (spatialState.activeMode === "channelSlope") spatialState.result.channelSlopeDistance = value;
   }
   const valueLabel = meta.type === "polygon" ? fmtCompact(value, 0, " m²") : fmtCompact(value, 1, " m");
-  layer.bindPopup(`<div class="spatial-popup"><b>${meta.label}</b><span>${valueLabel}</span><span>由右側圖層清單可再次開啟，重疊圖層也可選取。</span></div>`);
+  layer.bindPopup(`<div class="spatial-popup"><b>${meta.label}</b><span>${valueLabel}</span><span>由右側圖層清單可再次開啟；地圖圖形不阻擋後續量測點選。</span></div>`);
   addDrawnFeature({ mode: spatialState.activeMode, label: meta.label, valueLabel, layer, color: meta.color });
   resetCurrentMeasurement();
   renderSpatialResults();
@@ -504,7 +504,7 @@ async function handleElevationClick(latlng) {
       fillColor: meta.color,
       fillOpacity: 0.85,
       weight: 2,
-      bubblingMouseEvents: false
+      interactive: false
     }).addTo(spatialState.map);
     const valueLabel = `${elevation.toFixed(1)} m`;
     marker.bindPopup(`
@@ -537,6 +537,8 @@ function setMeasurementMode(mode) {
   if (!measureMeta[mode]) return;
   spatialState.activeMode = mode;
   resetCurrentMeasurement();
+  if (spatialState.map) spatialState.map.closePopup();
+  spatialState.selectedFeatureId = null;
   document.querySelectorAll(".measure-mode").forEach((button) => {
     button.classList.toggle("active", button.dataset.measureMode === mode);
   });
@@ -546,6 +548,7 @@ function setMeasurementMode(mode) {
     : `${meta.label}：在衛星影像上連續點選，完成後按「完成量測」。`;
   setMapStatus(message);
   renderMapLegend();
+  renderDrawnLayerList();
 }
 
 function clearSpatialMeasurements() {
@@ -611,7 +614,7 @@ function applySpatialEstimates() {
 function addMatayanReference() {
   if (!spatialState.map || !window.L) return;
   spatialState.map.setView([matayanLocation.lat, matayanLocation.lng], matayanLocation.zoom);
-  const marker = L.marker([matayanLocation.lat, matayanLocation.lng]).addTo(spatialState.map);
+  const marker = L.marker([matayanLocation.lat, matayanLocation.lng], { interactive: false }).addTo(spatialState.map);
   marker.bindPopup(`
     <div class="spatial-popup">
       <b>${matayanLocation.name}</b>
