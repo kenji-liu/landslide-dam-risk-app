@@ -239,6 +239,18 @@ function fmtCompact(value, digits = 0, unit = "") {
   return `${value.toLocaleString("zh-TW", { maximumFractionDigits: digits })}${unit}`;
 }
 
+function fmtLegendValue(mode) {
+  const valueMap = {
+    landslide: [spatialState.result.landslideArea, 0, "m²"],
+    damFootprint: [spatialState.result.damFootprintArea, 0, "m²"],
+    damWidth: [spatialState.result.damWidth, 1, "m"],
+    damLength: [spatialState.result.damLength, 1, "m"],
+    channelSlope: [spatialState.result.channelSlopeDistance, 1, "m"]
+  };
+  const [value, digits, unit] = valueMap[mode] || [0, 0, ""];
+  return fmtCompact(value, digits, ` ${unit}`);
+}
+
 function getInputNumber(id) {
   const el = document.querySelector(`#${id}`);
   if (!el) return 0;
@@ -312,6 +324,30 @@ function renderSpatialResults() {
     <div class="spatial-result"><strong>LDTop</strong><span>${fmtCompact(estimate.LDTop, 1, " m")}</span></div>
     <div class="spatial-result"><strong>S</strong><span>${fmtCompact(estimate.S, 4, " m/m")}</span></div>
   `;
+  renderMapLegend();
+}
+
+function renderMapLegend() {
+  const legend = document.querySelector("#mapLegend");
+  if (!legend) return;
+  const activeLabel = measureMeta[spatialState.activeMode]?.label || "未選擇";
+  legend.innerHTML = `
+    <h4>圈繪圖例 <span>目前：${activeLabel}</span></h4>
+    <div class="legend-list">
+      ${Object.entries(measureMeta).map(([mode, meta]) => {
+        const isLine = meta.type === "line";
+        const value = fmtLegendValue(mode);
+        const measured = !value.includes("尚未");
+        return `
+          <div class="legend-item ${spatialState.activeMode === mode ? "active" : ""}" style="--legend-color:${meta.color}">
+            <i class="legend-symbol ${isLine ? "line" : ""}"></i>
+            <span class="legend-label">${meta.label}</span>
+            <span class="legend-value">${measured ? value : "待圈繪"}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 function resetCurrentMeasurement() {
@@ -373,6 +409,7 @@ function setMeasurementMode(mode) {
   });
   const meta = measureMeta[mode];
   setMapStatus(`${meta.label}：在衛星影像上連續點選，完成後按「完成量測」。`);
+  renderMapLegend();
 }
 
 function clearSpatialMeasurements() {
