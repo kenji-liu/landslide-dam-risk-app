@@ -750,7 +750,7 @@ input, select, textarea {
 
 .gis-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(760px, 1fr) 340px;
   gap: 16px;
 }
 
@@ -760,7 +760,7 @@ input, select, textarea {
 
 .satellite-panel {
   position: relative;
-  min-height: 640px;
+  min-height: 760px;
   overflow: hidden;
   border: 1px solid #bfd0df;
   border-radius: 12px;
@@ -770,8 +770,8 @@ input, select, textarea {
 
 .satellite-map {
   width: 100%;
-  height: 640px;
-  min-height: 640px;
+  height: 760px;
+  min-height: 760px;
 }
 
 .map-status {
@@ -873,6 +873,8 @@ input, select, textarea {
 }
 
 .layer-panel {
+  max-height: 760px;
+  overflow: auto;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -964,6 +966,73 @@ input, select, textarea {
   color: #25465c;
   font-weight: 800;
   text-align: right;
+}
+
+.spatial-layer-list {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.spatial-layer-list h4 {
+  margin: 0 0 8px;
+  color: #173e56;
+  font-size: 14px;
+}
+
+#drawnLayerList {
+  display: grid;
+  gap: 8px;
+}
+
+.muted-empty {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px dashed #cbdce8;
+  border-radius: 8px;
+  color: #70869a;
+  background: #f8fbff;
+  font-size: 12px;
+}
+
+.drawn-layer-button {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px;
+  border: 1px solid #d6e4ee;
+  border-radius: 8px;
+  color: #23485f;
+  background: #f8fbff;
+  text-align: left;
+  font-size: 12px;
+}
+
+.drawn-layer-button:hover,
+.drawn-layer-button.active {
+  border-color: #91cfd8;
+  background: #eaf8fa;
+}
+
+.drawn-layer-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--layer-color);
+}
+
+.drawn-layer-value {
+  color: #60798b;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.param-field.spatial-linked {
+  border-color: #8bd0d8;
+  box-shadow: 0 0 0 3px rgba(42, 167, 165, .14);
 }
 
 .criteria-grid {
@@ -1093,6 +1162,8 @@ input, select, textarea {
   .sidebar-footer { display: none; }
   .main-content { margin-left: 78px; }
   .cards, .module-grid, .result-grid, .gis-layout, .steps, .figure-strip, .figure-gallery, .criteria-grid { grid-template-columns: 1fr 1fr; }
+  .gis-layout { grid-template-columns: minmax(0, 1fr); }
+  .layer-panel { max-height: none; }
   .expert-panel { grid-template-columns: 1fr; }
   .expert-heading { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 14px; }
   fieldset { grid-template-columns: 1fr 1fr; }
@@ -1121,8 +1192,8 @@ input, select, textarea {
   }
   .satellite-panel,
   .satellite-map {
-    min-height: 520px;
-    height: 520px;
+    min-height: 560px;
+    height: 560px;
   }
   .expert-findings { grid-template-columns: 1fr; }
   .page { padding: 16px; }

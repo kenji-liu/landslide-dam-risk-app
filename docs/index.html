@@ -216,12 +216,21 @@
                 <option value="osm">OpenStreetMap 地名道路</option>
               </select>
             </label>
+            <label>高程套用目標
+              <select id="elevationTarget">
+                <option value="crestElevation">壩頂/溢流點高程</option>
+                <option value="riverbedElevation">原河床高程</option>
+                <option value="slopeUpElevation">上游河床高程</option>
+                <option value="slopeDownElevation">下游河床高程</option>
+              </select>
+            </label>
             <div class="measure-tools">
               <button type="button" class="outline measure-mode active" data-measure-mode="landslide">圈繪崩塌 AL</button>
               <button type="button" class="outline measure-mode" data-measure-mode="damFootprint">圈繪壩體面積</button>
               <button type="button" class="outline measure-mode" data-measure-mode="damWidth">量測壩寬 WD</button>
               <button type="button" class="outline measure-mode" data-measure-mode="damLength">量測壩長 LDTop</button>
               <button type="button" class="outline measure-mode" data-measure-mode="channelSlope">量測河段長度</button>
+              <button type="button" class="outline measure-mode" data-measure-mode="elevationPoint">點選高程</button>
             </div>
             <div class="measure-actions">
               <button id="finishMeasurement" type="button">完成量測</button>
@@ -237,6 +246,10 @@
             </div>
             <p class="sync-note">空間量測成果會直接匯入「調查參數」並更新風險演算；按「同步至調查參數」可手動強制同步一次。</p>
             <div id="spatialResults" class="spatial-results"></div>
+            <div class="spatial-layer-list">
+              <h4>已圈繪圖層</h4>
+              <div id="drawnLayerList"></div>
+            </div>
           </div>
         </div>
         <section class="criteria-grid">

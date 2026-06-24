@@ -52,7 +52,25 @@ const measureMeta = {
   damFootprint: { label: "壩體足跡面積", type: "polygon", minPoints: 3, color: "#d98933" },
   damWidth: { label: "壩寬 WD", type: "line", minPoints: 2, color: "#2f80c2" },
   damLength: { label: "壩長 LDTop", type: "line", minPoints: 2, color: "#3a9b73" },
-  channelSlope: { label: "代表河段長度", type: "line", minPoints: 2, color: "#7b6fd6" }
+  channelSlope: { label: "代表河段長度", type: "line", minPoints: 2, color: "#7b6fd6" },
+  elevationPoint: { label: "點選高程", type: "point", minPoints: 1, color: "#0f6e82" }
+};
+
+const elevationTargetLabels = {
+  crestElevation: "壩頂/溢流點高程",
+  riverbedElevation: "原河床高程",
+  slopeUpElevation: "上游河床高程",
+  slopeDownElevation: "下游河床高程"
+};
+
+const paramSpatialLinks = {
+  landslideArea: { mode: "landslide" },
+  landslideVolume: { mode: "landslide" },
+  damVolume: { mode: "damFootprint" },
+  damHeight: { mode: "elevationPoint", target: "crestElevation" },
+  damWidth: { mode: "damWidth" },
+  damLength: { mode: "damLength" },
+  channelSlope: { mode: "channelSlope", target: "slopeUpElevation" }
 };
 
 const spatialState = {
@@ -62,13 +80,16 @@ const spatialState = {
   activeMode: "landslide",
   currentPoints: [],
   currentLayer: null,
+  selectedFeatureId: null,
   drawnLayers: [],
+  featureSeq: 0,
   result: {
     landslideArea: 0,
     damFootprintArea: 0,
     damWidth: 0,
     damLength: 0,
-    channelSlopeDistance: 0
+    channelSlopeDistance: 0,
+    lastElevation: 0
   }
 };
 
@@ -245,7 +266,8 @@ function fmtLegendValue(mode) {
     damFootprint: [spatialState.result.damFootprintArea, 0, "m²"],
     damWidth: [spatialState.result.damWidth, 1, "m"],
     damLength: [spatialState.result.damLength, 1, "m"],
-    channelSlope: [spatialState.result.channelSlopeDistance, 1, "m"]
+    channelSlope: [spatialState.result.channelSlopeDistance, 1, "m"],
+    elevationPoint: [spatialState.result.lastElevation, 1, "m"]
   };
   const [value, digits, unit] = valueMap[mode] || [0, 0, ""];
   return fmtCompact(value, digits, ` ${unit}`);
@@ -261,6 +283,20 @@ function getInputNumber(id) {
 function setMapStatus(message) {
   const status = document.querySelector("#mapStatus");
   if (status) status.textContent = message;
+}
+
+function elevationTarget() {
+  return document.querySelector("#elevationTarget")?.value || "crestElevation";
+}
+
+async function lookupElevation(latlng) {
+  const url = `https://api.open-meteo.com/v1/elevation?latitude=${latlng.lat.toFixed(6)}&longitude=${latlng.lng.toFixed(6)}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`高程 API 回應 ${response.status}`);
+  const data = await response.json();
+  const value = Array.isArray(data.elevation) ? Number(data.elevation[0]) : NaN;
+  if (!Number.isFinite(value)) throw new Error("高程 API 未回傳有效數值");
+  return value;
 }
 
 function polygonArea(latlngs) {
@@ -325,6 +361,53 @@ function renderSpatialResults() {
     <div class="spatial-result"><strong>S</strong><span>${fmtCompact(estimate.S, 4, " m/m")}</span></div>
   `;
   renderMapLegend();
+  renderDrawnLayerList();
+}
+
+function renderDrawnLayerList() {
+  const list = document.querySelector("#drawnLayerList");
+  if (!list) return;
+  if (spatialState.drawnLayers.length === 0) {
+    list.innerHTML = `<p class="muted-empty">尚未建立圈繪圖層。</p>`;
+    return;
+  }
+  list.innerHTML = spatialState.drawnLayers.map((feature) => `
+    <button type="button" class="drawn-layer-button ${spatialState.selectedFeatureId === feature.id ? "active" : ""}" data-feature-id="${feature.id}">
+      <i class="drawn-layer-swatch" style="--layer-color:${feature.color}"></i>
+      <span>${feature.label}</span>
+      <span class="drawn-layer-value">${feature.valueLabel}</span>
+    </button>
+  `).join("");
+}
+
+function addDrawnFeature({ mode, label, valueLabel, layer, color }) {
+  const feature = {
+    id: `feature-${spatialState.featureSeq += 1}`,
+    mode,
+    label,
+    valueLabel,
+    layer,
+    color
+  };
+  spatialState.drawnLayers.push(feature);
+  layer.on("click", () => {
+    spatialState.selectedFeatureId = feature.id;
+    if (layer.openPopup) layer.openPopup();
+    renderDrawnLayerList();
+  });
+  renderDrawnLayerList();
+  return feature;
+}
+
+function focusDrawnFeature(id) {
+  const feature = spatialState.drawnLayers.find((item) => item.id === id);
+  if (!feature || !spatialState.map) return;
+  spatialState.selectedFeatureId = id;
+  const layer = feature.layer;
+  if (layer.getBounds) spatialState.map.fitBounds(layer.getBounds(), { padding: [24, 24], maxZoom: 18 });
+  else if (layer.getLatLng) spatialState.map.setView(layer.getLatLng(), Math.max(spatialState.map.getZoom(), 17));
+  if (layer.openPopup) layer.openPopup();
+  renderDrawnLayerList();
 }
 
 function renderMapLegend() {
@@ -360,8 +443,8 @@ function drawCurrentMeasurement() {
   if (!spatialState.map) return;
   if (spatialState.currentLayer) spatialState.map.removeLayer(spatialState.currentLayer);
   const meta = measureMeta[spatialState.activeMode];
-  if (!meta || spatialState.currentPoints.length === 0) return;
-  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.22 };
+  if (!meta || meta.type === "point" || spatialState.currentPoints.length === 0) return;
+  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.22, bubblingMouseEvents: false };
   if (meta.type === "polygon" && spatialState.currentPoints.length >= 3) {
     spatialState.currentLayer = L.polygon(spatialState.currentPoints, options).addTo(spatialState.map);
   } else {
@@ -372,13 +455,17 @@ function drawCurrentMeasurement() {
 function finishMeasurement() {
   if (!spatialState.map) return;
   const meta = measureMeta[spatialState.activeMode];
+  if (meta?.type === "point") {
+    setMapStatus(`點選高程：請先選擇「高程套用目標」，再直接點擊地圖位置。`);
+    return;
+  }
   if (!meta || spatialState.currentPoints.length < meta.minPoints) {
     setMapStatus(`${meta ? meta.label : "量測"} 至少需要 ${meta ? meta.minPoints : 2} 個點。`);
     return;
   }
 
   const points = [...spatialState.currentPoints];
-  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.26 };
+  const options = { color: meta.color, weight: 3, fillColor: meta.color, fillOpacity: 0.26, bubblingMouseEvents: false };
   let value = 0;
   let layer;
   if (meta.type === "polygon") {
@@ -393,11 +480,57 @@ function finishMeasurement() {
     if (spatialState.activeMode === "damLength") spatialState.result.damLength = value;
     if (spatialState.activeMode === "channelSlope") spatialState.result.channelSlopeDistance = value;
   }
-  layer.bindPopup(`<div class="spatial-popup"><b>${meta.label}</b><span>${meta.type === "polygon" ? fmtCompact(value, 0, " m²") : fmtCompact(value, 1, " m")}</span></div>`);
-  spatialState.drawnLayers.push(layer);
+  const valueLabel = meta.type === "polygon" ? fmtCompact(value, 0, " m²") : fmtCompact(value, 1, " m");
+  layer.bindPopup(`<div class="spatial-popup"><b>${meta.label}</b><span>${valueLabel}</span><span>由右側圖層清單可再次開啟，重疊圖層也可選取。</span></div>`);
+  addDrawnFeature({ mode: spatialState.activeMode, label: meta.label, valueLabel, layer, color: meta.color });
   resetCurrentMeasurement();
   renderSpatialResults();
-  autoImportSpatialEstimates(`已完成 ${meta.label}：${meta.type === "polygon" ? fmtCompact(value, 0, " m²") : fmtCompact(value, 1, " m")}，`);
+  autoImportSpatialEstimates(`已完成 ${meta.label}：${valueLabel}，`);
+}
+
+async function handleElevationClick(latlng) {
+  const target = elevationTarget();
+  const targetLabel = elevationTargetLabels[target] || "高程欄位";
+  setMapStatus(`正在查詢 ${targetLabel} 高程...`);
+  try {
+    const elevation = await lookupElevation(latlng);
+    const input = document.querySelector(`#${target}`);
+    if (input) input.value = elevation.toFixed(1);
+    spatialState.result.lastElevation = elevation;
+    const meta = measureMeta.elevationPoint;
+    const marker = L.circleMarker(latlng, {
+      radius: 7,
+      color: meta.color,
+      fillColor: meta.color,
+      fillOpacity: 0.85,
+      weight: 2,
+      bubblingMouseEvents: false
+    }).addTo(spatialState.map);
+    const valueLabel = `${elevation.toFixed(1)} m`;
+    marker.bindPopup(`
+      <div class="spatial-popup">
+        <b>${targetLabel}</b>
+        <span>${valueLabel}</span>
+        <span>資料源：Open-Meteo Copernicus DEM GLO-90，供緊急概估。</span>
+      </div>
+    `).openPopup();
+    addDrawnFeature({ mode: "elevationPoint", label: targetLabel, valueLabel, layer: marker, color: meta.color });
+    handleSpatialEstimateInput();
+    setMapStatus(`${targetLabel} 已由地圖點選高程帶入 ${valueLabel}，並同步更新調查參數。`);
+  } catch (error) {
+    setMapStatus(`高程查詢失敗：${error.message}。可先改用人工輸入或既有 DEM 成果。`);
+  }
+}
+
+function handleMapClick(event) {
+  if (spatialState.activeMode === "elevationPoint") {
+    handleElevationClick(event.latlng);
+    return;
+  }
+  spatialState.currentPoints.push(event.latlng);
+  drawCurrentMeasurement();
+  const meta = measureMeta[spatialState.activeMode];
+  setMapStatus(`${meta.label} 已點選 ${spatialState.currentPoints.length} 點；完成後按「完成量測」。`);
 }
 
 function setMeasurementMode(mode) {
@@ -408,20 +541,25 @@ function setMeasurementMode(mode) {
     button.classList.toggle("active", button.dataset.measureMode === mode);
   });
   const meta = measureMeta[mode];
-  setMapStatus(`${meta.label}：在衛星影像上連續點選，完成後按「完成量測」。`);
+  const message = meta.type === "point"
+    ? `${meta.label}：先選擇高程套用目標，再點擊地圖，系統會以公開 DEM 概估高程。`
+    : `${meta.label}：在衛星影像上連續點選，完成後按「完成量測」。`;
+  setMapStatus(message);
   renderMapLegend();
 }
 
 function clearSpatialMeasurements() {
   resetCurrentMeasurement();
-  spatialState.drawnLayers.forEach((layer) => spatialState.map && spatialState.map.removeLayer(layer));
+  spatialState.drawnLayers.forEach((feature) => spatialState.map && spatialState.map.removeLayer(feature.layer));
   spatialState.drawnLayers = [];
+  spatialState.selectedFeatureId = null;
   spatialState.result = {
     landslideArea: 0,
     damFootprintArea: 0,
     damWidth: 0,
     damLength: 0,
-    channelSlopeDistance: 0
+    channelSlopeDistance: 0,
+    lastElevation: 0
   };
   renderSpatialResults();
   setMapStatus("已清除量測圖形。請重新選擇量測項目後點選地圖。");
@@ -481,7 +619,7 @@ function addMatayanReference() {
       <span>案例值可由右上角「馬太鞍溪堰塞湖案例」套用。</span>
     </div>
   `).openPopup();
-  spatialState.drawnLayers.push(marker);
+  addDrawnFeature({ mode: "elevationPoint", label: "馬太鞍溪案例定位", valueLabel: "23.6995, 121.2955", layer: marker, color: "#0f6e82" });
   spatialState.result.landslideArea = matayanPreset.landslideArea;
   spatialState.result.damWidth = matayanPreset.damWidth;
   spatialState.result.damLength = matayanPreset.damLength;
@@ -513,12 +651,7 @@ function initSpatialMap() {
     attribution: "&copy; OpenStreetMap contributors"
   });
   spatialState.activeBaseLayer = spatialState.baseLayers.satellite.addTo(spatialState.map);
-  spatialState.map.on("click", (event) => {
-    spatialState.currentPoints.push(event.latlng);
-    drawCurrentMeasurement();
-    const meta = measureMeta[spatialState.activeMode];
-    setMapStatus(`${meta.label} 已點選 ${spatialState.currentPoints.length} 點；完成後按「完成量測」。`);
-  });
+  spatialState.map.on("click", handleMapClick);
   spatialState.map.on("dblclick", finishMeasurement);
   setMeasurementMode("landslide");
 }
@@ -839,6 +972,23 @@ function handleSpatialEstimateInput() {
   autoImportSpatialEstimates("推估條件調整後，");
 }
 
+function setElevationTarget(target) {
+  const select = document.querySelector("#elevationTarget");
+  if (select && elevationTargetLabels[target]) select.value = target;
+}
+
+function selectSpatialToolFromParam(fieldName) {
+  const link = paramSpatialLinks[fieldName];
+  document.querySelectorAll(".param-field").forEach((field) => field.classList.remove("spatial-linked"));
+  const control = form.elements[fieldName];
+  if (control?.closest) control.closest(".param-field")?.classList.add("spatial-linked");
+  if (!link) return;
+  if (link.target) setElevationTarget(link.target);
+  setMeasurementMode(link.mode);
+  const label = control?.closest(".param-field")?.textContent?.replace(/\s+/g, " ").trim() || fieldName;
+  setMapStatus(`已依調查參數「${label.slice(0, 28)}」同步選取空間研判工具。切換到空間研判即可直接圈繪或點選高程。`);
+}
+
 document.querySelector("#dateDisplay").textContent = new Date().toLocaleDateString("zh-TW", {
   year: "numeric", month: "long", day: "numeric", weekday: "short"
 });
@@ -880,6 +1030,15 @@ document.querySelector("#finishMeasurement").addEventListener("click", finishMea
 document.querySelector("#clearMeasurement").addEventListener("click", clearSpatialMeasurements);
 document.querySelector("#applySpatialEstimates").addEventListener("click", applySpatialEstimates);
 document.querySelector("#focusMatayan").addEventListener("click", addMatayanReference);
+document.querySelector("#drawnLayerList").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-feature-id]");
+  if (button) focusDrawnFeature(button.dataset.featureId);
+});
+document.querySelector("#elevationTarget").addEventListener("change", () => {
+  if (spatialState.activeMode === "elevationPoint") {
+    setMapStatus(`點選高程：目前會套用至「${elevationTargetLabels[elevationTarget()]}」。`);
+  }
+});
 document.querySelector("#basemapSelect").addEventListener("change", (event) => {
   if (!spatialState.map) return;
   if (spatialState.activeBaseLayer) spatialState.map.removeLayer(spatialState.activeBaseLayer);
@@ -889,6 +1048,10 @@ document.querySelector("#basemapSelect").addEventListener("change", (event) => {
 ["landslideThickness", "crestElevation", "riverbedElevation", "damShapeFactor", "slopeUpElevation", "slopeDownElevation"].forEach((id) => {
   const input = document.querySelector(`#${id}`);
   if (input) input.addEventListener("input", handleSpatialEstimateInput);
+});
+[...form.elements].filter((el) => el.name).forEach((el) => {
+  el.addEventListener("focus", () => selectSpatialToolFromParam(el.name));
+  el.addEventListener("click", () => selectSpatialToolFromParam(el.name));
 });
 
 addParameterSketches();
