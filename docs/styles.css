@@ -1120,6 +1120,80 @@ input, select, textarea {
   max-width: 980px;
 }
 
+.ai-responder {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.ai-responder-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.ai-responder-head h3 {
+  margin-bottom: 4px;
+}
+
+.ai-responder-head p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quick-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.quick-prompts button {
+  min-height: 34px;
+  color: #1f3b55;
+  background: #f8fbff;
+  border-color: #cbd7e4;
+}
+
+.ai-question {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+#aiQuestion {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.ai-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.ai-reply {
+  min-height: 150px;
+  padding: 16px;
+  border: 1px solid #cfe0ea;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff, #f7fbff);
+}
+
+.ai-reply p {
+  margin: 0 0 8px;
+  color: #173e56;
+  line-height: 1.75;
+}
+
+.ai-placeholder {
+  color: var(--muted) !important;
+}
+
 .ai-badge,
 .ai-fab {
   display: grid;

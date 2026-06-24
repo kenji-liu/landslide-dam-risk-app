@@ -6,6 +6,8 @@ const recommendation = document.querySelector("#recommendation");
 const reportText = document.querySelector("#reportText");
 const aiSummary = document.querySelector("#aiSummary");
 const expertFindings = document.querySelector("#expertFindings");
+const aiQuestion = document.querySelector("#aiQuestion");
+const aiReply = document.querySelector("#aiReply");
 
 const pageTitles = {
   dashboard: "專家總覽",
@@ -926,6 +928,85 @@ function renderAiSummary() {
     <p><b>監測重點：</b>優先追蹤壩頂溢流、滲流出水、壩體裂縫、蓄水位變化、下游河床沖刷與降雨入流條件。</p>
     <p><b>決策建議：</b>在外業資料未補齊前，建議維持 ${latest.monitoring}，並依 ${latest.alert} 原則辦理；若後續雨量或水位上升，應即時更新洪峰流量與保全對象影響範圍。</p>
   `;
+  if (aiReply && !aiReply.dataset.locked) {
+    aiReply.innerHTML = `<p class="ai-placeholder">輸入問題後按「產生專家回覆」，系統會依目前參數即時生成回覆。</p>`;
+  }
+}
+
+function keyMetricLines() {
+  return [
+    `案件：${latest.caseName}`,
+    `風險：${latest.risk}；潰壩危險度 ${latest.dangerLevel}；保全危害度 ${latest.exposure}`,
+    `壩體：HDmin ${fmt(latest.H, 1)} m、WD ${fmt(latest.W, 1)} m、LDTop ${fmt(latest.L, 1)} m、VD ${fmt(latest.VD, 0)} m³`,
+    `崩塌：AL ${fmt(num("landslideArea"), 0)} m²、VL ${fmt(latest.VL, 0)} m³；河床坡降 S ${fmt(latest.S, 4)} m/m`,
+    `水理：蓄水量 ${fmt(latest.VW, 0)} m³、估算洪峰 ${fmt(latest.qpSelected, 0)} m³/s、代表水深 ${fmt(latest.waterDepth, 1)} m`
+  ];
+}
+
+function missingDataAdvice() {
+  const checks = [
+    ["上游集水區面積 AD", latest.AD],
+    ["崩塌面積 AL", num("landslideArea")],
+    ["崩塌體積 VL", latest.VL],
+    ["壩體體積 VD", latest.VD],
+    ["壩高 HDmin", latest.H],
+    ["壩寬 WD", latest.W],
+    ["壩長 LDTop", latest.L],
+    ["河床坡降 S", latest.S],
+    ["蓄水體積 VW", latest.VW],
+    ["代表河寬 Bw", latest.Bw],
+    ["代表流速 vw", latest.velocity],
+    ["保全高程差 Hpo", latest.Hpo]
+  ];
+  return checks.filter(([, value]) => !Number.isFinite(value) || value <= 0).map(([label]) => label);
+}
+
+function generateExpertReply(question = "") {
+  if (latest.risk === "待評估") {
+    return `【AI 專家回復｜待評估】\n目前核心資料仍不足，尚不建議直接下致災風險結論。請優先補齊壩體幾何、壩體體積、集水區面積、河床坡降、蓄水體積與下游代表斷面資料。\n\n建議先完成：\n1. 於空間研判圈繪 AL、壩體足跡，並量測 WD、LDTop、代表河段長度。\n2. 以點選高程或既有 DEM 補入壩頂/溢流點、原河床、上下游河床高程。\n3. 回到風險演算檢核 DBI、AHV/AHWL、HDSI 與洪峰水位。`;
+  }
+
+  const q = question.toLowerCase();
+  const missing = missingDataAdvice();
+  const unstable = latest.stabilityRows.filter((row) => row[2] === "不穩定").map((row) => row[0]);
+  const controlText = latest.risk === "極高風險" || latest.risk === "高風險"
+    ? `建議依「${latest.alert}」原則辦理，並同步設置河道、橋梁、道路與可及河床活動管制。`
+    : `目前可先採「${latest.monitoring}」與河道警戒管制，但若雨量、水位或滲流跡象升高，應立即重算並提高應變層級。`;
+  const uncertaintyText = missing.length
+    ? `目前仍需補強的資料包括：${missing.slice(0, 6).join("、")}${missing.length > 6 ? "等" : ""}。`
+    : "目前核心參數已具備初判條件，但仍建議用最新 UAV 正射、DSM/DEM 差分與現地水位觀測校核。";
+  const failureText = unstable.length
+    ? `安定性指標中 ${unstable.join("、")} 指向不穩定或需保守看待，應把溢流沖刷、滲流破壞與局部潰口擴大列入情境。`
+    : "目前安定性指標未全部指向明確失穩，但堰塞壩材料鬆散且水位會隨降雨快速改變，仍應採動態監測。";
+
+  let focus = "綜合判斷";
+  let body = `綜合目前輸入參數，本案初步致災風險為「${latest.risk}」，潰壩危險度為「${latest.dangerLevel}」，保全危害度為「${latest.exposure}」。${failureText} ${controlText}`;
+
+  if (q.includes("撤離") || q.includes("管制") || q.includes("警戒")) {
+    focus = "撤離與管制作為";
+    body = `${controlText} 若下游存在聚落、道路、橋梁或施工/遊憩活動，應優先建立警戒水位、雨量門檻與通報窗口；高風險以上情境不建議等待壩體明顯破壞後才啟動撤離。`;
+  } else if (q.includes("不確定") || q.includes("資料") || q.includes("補充")) {
+    focus = "資料缺口與不確定性";
+    body = `${uncertaintyText} 尤其 VD、HDmin、VW、S 與下游 Bw/vw 會直接影響安定性與洪峰水位判斷，建議以 UAV、衛星影像、現地測距及 DEM 剖面交叉確認。`;
+  } else if (q.includes("調查") || q.includes("監測") || q.includes("下一步")) {
+    focus = "現地調查與監測";
+    body = `下一步建議先完成壩頂溢流點、滲流出水、裂縫、蓄水位與下游沖刷點位巡查；同時用空間研判更新 AL、VD、WD、LDTop 與 S，並至少建立雨量、水位、影像三類監測。`;
+  } else if (q.includes("簡報") || q.includes("長官") || q.includes("決策")) {
+    focus = "決策簡報口徑";
+    body = `可向決策端說明：本案目前判定為「${latest.risk}」，主要控制因子為壩體幾何、蓄水量與下游保全暴露。短期策略是 ${latest.monitoring}、${latest.alert}，工程急迫性為「${latest.urgency}」。`;
+  }
+
+  return `【AI 專家回復｜${focus}】\n${body}\n\n關鍵依據：\n- ${keyMetricLines().join("\n- ")}\n- 處置建議：${latest.monitoring}；警戒作為：${latest.alert}；工程急迫性：${latest.urgency}\n\n專業提醒：本回覆為依調查參數與內建判釋規則產生的專家輔助文字，正式決策仍需搭配現地觀測、最新地形資料與主管機關應變程序。`;
+}
+
+function renderExpertReply(question = "") {
+  const reply = generateExpertReply(question || aiQuestion?.value || "");
+  if (!aiReply) return;
+  aiReply.dataset.locked = "true";
+  aiReply.innerHTML = reply
+    .split("\n")
+    .map((line) => line.trim() ? `<p>${line.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>` : `<br>`)
+    .join("");
 }
 
 function loadPreset(preset) {
@@ -1025,6 +1106,23 @@ document.querySelector("#copyReport").addEventListener("click", async () => {
   await navigator.clipboard.writeText(reportText.value);
   document.querySelector("#copyReport").textContent = "已複製";
   setTimeout(() => (document.querySelector("#copyReport").textContent = "複製摘要"), 1200);
+});
+document.querySelector("#generateAiReply").addEventListener("click", () => renderExpertReply());
+document.querySelector("#clearAiQuestion").addEventListener("click", () => {
+  aiQuestion.value = "";
+  aiReply.dataset.locked = "";
+  renderAiSummary();
+});
+document.querySelector("#copyAiReply").addEventListener("click", async () => {
+  await navigator.clipboard.writeText(aiReply.innerText || "");
+  document.querySelector("#copyAiReply").textContent = "已複製";
+  setTimeout(() => (document.querySelector("#copyAiReply").textContent = "複製回覆"), 1200);
+});
+document.querySelectorAll("[data-ai-prompt]").forEach((button) => {
+  button.addEventListener("click", () => {
+    aiQuestion.value = button.dataset.aiPrompt;
+    renderExpertReply(aiQuestion.value);
+  });
 });
 document.querySelectorAll(".measure-mode").forEach((button) => {
   button.addEventListener("click", () => setMeasurementMode(button.dataset.measureMode));

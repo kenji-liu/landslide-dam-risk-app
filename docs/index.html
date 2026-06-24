@@ -298,6 +298,29 @@
           <span class="ai-badge">AI</span>
           <h2>技術分析摘要</h2>
           <div id="aiSummary"></div>
+          <div class="ai-responder">
+            <div class="ai-responder-head">
+              <div>
+                <h3>AI 專家回復</h3>
+                <p>依目前調查參數與風險演算，產生可貼入會議、通報或現地討論的專家式回覆。</p>
+              </div>
+              <button id="copyAiReply" type="button" class="outline">複製回覆</button>
+            </div>
+            <div class="quick-prompts">
+              <button type="button" data-ai-prompt="請判斷目前是否需要撤離或管制。">撤離與管制</button>
+              <button type="button" data-ai-prompt="請說明目前最關鍵的不確定性與需補充資料。">不確定性</button>
+              <button type="button" data-ai-prompt="請提出下一步現地調查與監測建議。">現地調查</button>
+              <button type="button" data-ai-prompt="請用簡報口吻整理給決策長官的回覆。">決策簡報</button>
+            </div>
+            <label class="ai-question">提問內容
+              <textarea id="aiQuestion" placeholder="例：目前壩體是否可能潰決？下游保全對象應如何處置？"></textarea>
+            </label>
+            <div class="ai-actions">
+              <button id="generateAiReply" type="button">產生專家回覆</button>
+              <button id="clearAiQuestion" type="button" class="outline">清空問題</button>
+            </div>
+            <article id="aiReply" class="ai-reply"></article>
+          </div>
         </div>
       </section>
     </main>
