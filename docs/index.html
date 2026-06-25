@@ -216,6 +216,15 @@
                 <option value="osm">OpenStreetMap 地名道路</option>
               </select>
             </label>
+            <div class="copernicus-tools">
+              <strong>Copernicus Data Space</strong>
+              <p>Sentinel-2 L2A｜2026-04-14｜False Color｜雲量 30%</p>
+              <div>
+                <button id="focusCopernicus" type="button" class="outline">定位 Copernicus 範圍</button>
+                <button id="openCopernicus" type="button" class="outline">開啟圖台</button>
+                <button id="toggleCopernicusPanel" type="button">內嵌圖台</button>
+              </div>
+            </div>
             <label>高程套用目標
               <select id="elevationTarget">
                 <option value="crestElevation">壩頂/溢流點高程</option>
@@ -252,6 +261,17 @@
             </div>
           </div>
         </div>
+        <section id="copernicusPanel" class="copernicus-panel" hidden>
+          <div class="copernicus-panel-head">
+            <div>
+              <h3>Copernicus Data Space Browser</h3>
+              <p>以外部 Sentinel-2 L2A False Color 圖台輔助判釋崩塌裸露區與河道堆積形貌。</p>
+            </div>
+            <a id="copernicusExternalLink" href="#" target="_blank" rel="noopener">另開圖台</a>
+          </div>
+          <iframe id="copernicusFrame" title="Copernicus Data Space Browser"></iframe>
+          <p class="copernicus-note">若瀏覽器或 Copernicus 安全政策阻擋內嵌顯示，請使用「另開圖台」。量測與參數回填仍在上方本系統圖台進行。</p>
+        </section>
         <section class="criteria-grid">
           <article>
             <strong>AL 崩塌面積</strong>

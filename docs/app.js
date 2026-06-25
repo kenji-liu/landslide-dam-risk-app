@@ -49,6 +49,13 @@ const matayanLocation = {
   zoom: 15
 };
 
+const copernicusView = {
+  lat: 23.69711,
+  lng: 121.31018,
+  zoom: 14,
+  url: "https://browser.dataspace.copernicus.eu/?zoom=14&lat=23.69711&lng=121.31018&themeId=DEFAULT-THEME&visualizationUrl=U2FsdGVkX1%2Bwqz6C%2FJI4OUsBDU2vxXGJMALdaS2nR9lzH3xz7xPZemkWEzUeRIYHYdqV7id2ftM0ZP%2BHcUS%2F1auSQs%2BxRIGY0Vx3oB6uoahSLK%2BedSpLAngjaabL43wC&datasetId=S2_L2A_CDAS&fromTime=2026-04-14T00%3A00%3A00.000Z&toTime=2026-04-14T23%3A59%3A59.999Z&layerId=2_FALSE_COLOR&demSource3D=%22MAPZEN%22&cloudCoverage=30&dateMode=SINGLE"
+};
+
 const measureMeta = {
   landslide: { label: "崩塌面積 AL", type: "polygon", minPoints: 3, color: "#c85252" },
   damFootprint: { label: "壩體足跡面積", type: "polygon", minPoints: 3, color: "#d98933" },
@@ -285,6 +292,51 @@ function getInputNumber(id) {
 function setMapStatus(message) {
   const status = document.querySelector("#mapStatus");
   if (status) status.textContent = message;
+}
+
+function copernicusUrlFromMap() {
+  const url = new URL(copernicusView.url);
+  if (spatialState.map) {
+    const center = spatialState.map.getCenter();
+    url.searchParams.set("lat", center.lat.toFixed(5));
+    url.searchParams.set("lng", center.lng.toFixed(5));
+    url.searchParams.set("zoom", Math.round(spatialState.map.getZoom()));
+  }
+  return url.toString();
+}
+
+function updateCopernicusLinks() {
+  const url = copernicusUrlFromMap();
+  const link = document.querySelector("#copernicusExternalLink");
+  if (link) link.href = url;
+  return url;
+}
+
+function focusCopernicusView() {
+  if (!spatialState.map) return;
+  spatialState.map.setView([copernicusView.lat, copernicusView.lng], copernicusView.zoom);
+  updateCopernicusLinks();
+  setMapStatus("已定位至 Copernicus Data Space Browser 連結範圍，可對照 Sentinel-2 False Color 影像判釋。");
+}
+
+function openCopernicusBrowser() {
+  const url = updateCopernicusLinks();
+  window.open(url, "_blank", "noopener");
+}
+
+function toggleCopernicusPanel() {
+  const panel = document.querySelector("#copernicusPanel");
+  const frame = document.querySelector("#copernicusFrame");
+  const button = document.querySelector("#toggleCopernicusPanel");
+  if (!panel || !frame || !button) return;
+  const willShow = panel.hidden;
+  panel.hidden = !willShow;
+  button.textContent = willShow ? "隱藏圖台" : "內嵌圖台";
+  if (willShow) {
+    frame.src = updateCopernicusLinks();
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    setMapStatus("已嘗試內嵌 Copernicus 圖台；若無法顯示，請使用「開啟圖台」。");
+  }
 }
 
 function elevationTarget() {
@@ -658,6 +710,8 @@ function initSpatialMap() {
   spatialState.activeBaseLayer = spatialState.baseLayers.satellite.addTo(spatialState.map);
   spatialState.map.on("click", handleMapClick);
   spatialState.map.on("dblclick", finishMeasurement);
+  spatialState.map.on("moveend", updateCopernicusLinks);
+  updateCopernicusLinks();
   setMeasurementMode("landslide");
 }
 
@@ -1131,6 +1185,9 @@ document.querySelector("#finishMeasurement").addEventListener("click", finishMea
 document.querySelector("#clearMeasurement").addEventListener("click", clearSpatialMeasurements);
 document.querySelector("#applySpatialEstimates").addEventListener("click", applySpatialEstimates);
 document.querySelector("#focusMatayan").addEventListener("click", addMatayanReference);
+document.querySelector("#focusCopernicus").addEventListener("click", focusCopernicusView);
+document.querySelector("#openCopernicus").addEventListener("click", openCopernicusBrowser);
+document.querySelector("#toggleCopernicusPanel").addEventListener("click", toggleCopernicusPanel);
 document.querySelector("#drawnLayerList").addEventListener("click", (event) => {
   const button = event.target.closest("[data-feature-id]");
   if (button) focusDrawnFeature(button.dataset.featureId);
