@@ -306,10 +306,7 @@ function copernicusUrlFromMap() {
 }
 
 function updateCopernicusLinks() {
-  const url = copernicusUrlFromMap();
-  const link = document.querySelector("#copernicusExternalLink");
-  if (link) link.href = url;
-  return url;
+  return copernicusUrlFromMap();
 }
 
 function focusCopernicusView() {
@@ -319,11 +316,6 @@ function focusCopernicusView() {
   setMapStatus("已定位至 Copernicus Data Space Browser 連結範圍，可對照 Sentinel-2 False Color 影像判釋。");
 }
 
-function openCopernicusBrowser() {
-  const url = updateCopernicusLinks();
-  window.open(url, "_blank", "noopener");
-}
-
 function toggleCopernicusPanel() {
   const panel = document.querySelector("#copernicusPanel");
   const frame = document.querySelector("#copernicusFrame");
@@ -331,11 +323,11 @@ function toggleCopernicusPanel() {
   if (!panel || !frame || !button) return;
   const willShow = panel.hidden;
   panel.hidden = !willShow;
-  button.textContent = willShow ? "隱藏圖台" : "內嵌圖台";
+  button.textContent = willShow ? "隱藏圖台" : "平台開啟圖台";
   if (willShow) {
     frame.src = updateCopernicusLinks();
     panel.scrollIntoView({ behavior: "smooth", block: "start" });
-    setMapStatus("已嘗試內嵌 Copernicus 圖台；若無法顯示，請使用「開啟圖台」。");
+    setMapStatus("已在平台內開啟 Copernicus 圖台，可於下方對照 Sentinel-2 False Color 影像。");
   }
 }
 
@@ -1186,7 +1178,6 @@ document.querySelector("#clearMeasurement").addEventListener("click", clearSpati
 document.querySelector("#applySpatialEstimates").addEventListener("click", applySpatialEstimates);
 document.querySelector("#focusMatayan").addEventListener("click", addMatayanReference);
 document.querySelector("#focusCopernicus").addEventListener("click", focusCopernicusView);
-document.querySelector("#openCopernicus").addEventListener("click", openCopernicusBrowser);
 document.querySelector("#toggleCopernicusPanel").addEventListener("click", toggleCopernicusPanel);
 document.querySelector("#drawnLayerList").addEventListener("click", (event) => {
   const button = event.target.closest("[data-feature-id]");

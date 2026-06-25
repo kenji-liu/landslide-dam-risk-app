@@ -912,10 +912,6 @@ input, select, textarea {
   gap: 8px;
 }
 
-.copernicus-tools button:last-child {
-  grid-column: 1 / -1;
-}
-
 .copernicus-panel {
   margin-top: 16px;
   overflow: hidden;
@@ -943,17 +939,6 @@ input, select, textarea {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
-}
-
-.copernicus-panel-head a {
-  flex: 0 0 auto;
-  padding: 8px 12px;
-  border: 1px solid #cbd7e4;
-  border-radius: 8px;
-  color: #1f3b55;
-  background: #f8fbff;
-  text-decoration: none;
-  font-weight: 900;
 }
 
 #copernicusFrame {
