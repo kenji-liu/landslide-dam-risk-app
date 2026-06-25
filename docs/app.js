@@ -316,19 +316,9 @@ function focusCopernicusView() {
   setMapStatus("已定位至 Copernicus Data Space Browser 連結範圍，可對照 Sentinel-2 False Color 影像判釋。");
 }
 
-function toggleCopernicusPanel() {
-  const panel = document.querySelector("#copernicusPanel");
-  const frame = document.querySelector("#copernicusFrame");
-  const button = document.querySelector("#toggleCopernicusPanel");
-  if (!panel || !frame || !button) return;
-  const willShow = panel.hidden;
-  panel.hidden = !willShow;
-  button.textContent = willShow ? "隱藏圖台" : "平台開啟圖台";
-  if (willShow) {
-    frame.src = updateCopernicusLinks();
-    panel.scrollIntoView({ behavior: "smooth", block: "start" });
-    setMapStatus("已在平台內開啟 Copernicus 圖台，可於下方對照 Sentinel-2 False Color 影像。");
-  }
+function openCopernicusCurrentTab() {
+  const url = updateCopernicusLinks();
+  window.location.assign(url);
 }
 
 function elevationTarget() {
@@ -1178,7 +1168,7 @@ document.querySelector("#clearMeasurement").addEventListener("click", clearSpati
 document.querySelector("#applySpatialEstimates").addEventListener("click", applySpatialEstimates);
 document.querySelector("#focusMatayan").addEventListener("click", addMatayanReference);
 document.querySelector("#focusCopernicus").addEventListener("click", focusCopernicusView);
-document.querySelector("#toggleCopernicusPanel").addEventListener("click", toggleCopernicusPanel);
+document.querySelector("#openCopernicusCurrentTab").addEventListener("click", openCopernicusCurrentTab);
 document.querySelector("#drawnLayerList").addEventListener("click", (event) => {
   const button = event.target.closest("[data-feature-id]");
   if (button) focusDrawnFeature(button.dataset.featureId);
