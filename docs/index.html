@@ -19,6 +19,7 @@
       <button class="nav-item active" data-page="dashboard"><span>▦</span> 專家總覽</button>
       <button class="nav-item" data-page="survey"><span>▣</span> 調查參數</button>
       <button class="nav-item" data-page="risk"><span>▤</span> 風險演算</button>
+      <button class="nav-item" data-page="storage"><span>庫</span> 庫容剖面</button>
       <button class="nav-item" data-page="figures"><span>圖</span> 示意圖庫</button>
       <button class="nav-item" data-page="gis"><span>◎</span> 空間研判</button>
       <button class="nav-item" data-page="report"><span>▨</span> 通報報告</button>
@@ -172,6 +173,56 @@
           </div>
           <div id="recommendation" class="recommendation"></div>
         </article>
+      </section>
+
+      <section class="page" id="storage">
+        <div class="toolbar-card">
+          <div>
+            <h2>庫容剖面分析</h2>
+            <p>納入水位情境、三維庫容、縱橫剖面與庫容曲線，供判斷蓄水量、距溢流餘裕與下游洪峰敏感度。</p>
+          </div>
+          <button id="applyStorageToSurvey" type="button">套入蓄水體積</button>
+        </div>
+        <div class="storage-controls module-card">
+          <div class="water-level-control">
+            <label>情境水位 H<sub>w</sub> (m)
+              <input id="waterLevelSlider" type="range" min="1049" max="1086" step="0.5" value="1070" />
+            </label>
+            <strong id="waterLevelReadout">1070.0 m</strong>
+          </div>
+          <div class="storage-inputs">
+            <label>目前水位 (m)<input id="currentWaterLevel" type="number" value="1070.08" step="0.1" /></label>
+            <label>湖底/河床高程 (m)<input id="lakeBedElevation" type="number" value="1049" step="0.1" /></label>
+            <label>溢流口高程 (m)<input id="spillwayElevation" type="number" value="1086" step="0.1" /></label>
+            <label>滿水庫容 (萬 m³)<input id="maxStorageVolume" type="number" value="500" min="1" step="1" /></label>
+            <label>庫容曲線指數<input id="storageExponent" type="number" value="1.65" min="0.5" step="0.05" /></label>
+          </div>
+        </div>
+        <div id="storageSummary" class="cards metric-cards"></div>
+        <div class="storage-grid">
+          <article class="module-card storage-visual">
+            <h3>三維庫容概念</h3>
+            <div id="storage3d"></div>
+          </article>
+          <article class="module-card storage-visual">
+            <h3>縱剖面</h3>
+            <div id="longProfileChart"></div>
+          </article>
+          <article class="module-card storage-visual">
+            <h3>橫剖面</h3>
+            <div id="crossProfileChart"></div>
+          </article>
+          <article class="module-card storage-visual">
+            <h3>庫容曲線</h3>
+            <div id="storageCurveChart"></div>
+          </article>
+        </div>
+        <section class="criteria-grid storage-notes">
+          <article><strong>資料來源建議</strong><p>可由坡地災害情資網、UAV DSM/DEM、災前災後 DEM 差分或現地水位尺建立庫容曲線。</p></article>
+          <article><strong>水位情境</strong><p>以 0.5 m 或實測時間序列推估蓄水量變化，接近溢流口時需同步提高警戒。</p></article>
+          <article><strong>剖面校核</strong><p>縱剖檢查上游回水與壩頂溢流點；橫剖檢查左右岸高差、沖蝕與可能洩流路徑。</p></article>
+          <article><strong>風險串接</strong><p>按「套入蓄水體積」可把目前庫容回填至 Vw，重新觸發洪峰與致災風險計算。</p></article>
+        </section>
       </section>
 
       <section class="page" id="figures">

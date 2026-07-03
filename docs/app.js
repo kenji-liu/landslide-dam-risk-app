@@ -8,11 +8,13 @@ const aiSummary = document.querySelector("#aiSummary");
 const expertFindings = document.querySelector("#expertFindings");
 const aiQuestion = document.querySelector("#aiQuestion");
 const aiReply = document.querySelector("#aiReply");
+const storageSummary = document.querySelector("#storageSummary");
 
 const pageTitles = {
   dashboard: "專家總覽",
   survey: "調查參數",
   risk: "風險演算",
+  storage: "庫容剖面",
   figures: "示意圖庫",
   gis: "空間研判",
   report: "通報報告",
@@ -41,6 +43,7 @@ const matayanPreset = {
 };
 
 let latest = {};
+let storageState = null;
 
 const matayanLocation = {
   name: "馬太鞍溪堰塞湖",
@@ -358,6 +361,122 @@ function lineDistance(latlngs) {
     distance += spatialState.map.distance(latlngs[i - 1], latlngs[i]);
   }
   return distance;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getStorageInputs() {
+  const bed = getInputNumber("lakeBedElevation") || 1049;
+  const spillway = getInputNumber("spillwayElevation") || 1086;
+  const level = getInputNumber("currentWaterLevel") || bed;
+  const maxStorage10k = getInputNumber("maxStorageVolume") || 500;
+  const exponent = getInputNumber("storageExponent") || 1.65;
+  return { bed, spillway, level, maxStorage10k, exponent };
+}
+
+function estimateStorageFromLevel(level, bed, spillway, maxStorage10k, exponent) {
+  const ratio = spillway > bed ? clamp((level - bed) / (spillway - bed), 0, 1) : 0;
+  return maxStorage10k * Math.pow(ratio, exponent);
+}
+
+function storagePoint(level, bed, spillway, maxStorage10k, exponent) {
+  const storage10k = estimateStorageFromLevel(level, bed, spillway, maxStorage10k, exponent);
+  const freeboard = spillway - level;
+  const percent = maxStorage10k > 0 ? storage10k / maxStorage10k * 100 : 0;
+  return { level, storage10k, freeboard, percent };
+}
+
+function renderStorageAnalysis() {
+  if (!storageSummary) return;
+  const inputs = getStorageInputs();
+  const slider = document.querySelector("#waterLevelSlider");
+  if (slider) {
+    slider.min = inputs.bed.toFixed(1);
+    slider.max = inputs.spillway.toFixed(1);
+    if (Number(slider.value) < inputs.bed || Number(slider.value) > inputs.spillway) slider.value = inputs.level.toFixed(1);
+  }
+  const level = slider ? Number(slider.value) : inputs.level;
+  const point = storagePoint(level, inputs.bed, inputs.spillway, inputs.maxStorage10k, inputs.exponent);
+  storageState = { ...inputs, ...point, storageM3: point.storage10k * 10000 };
+
+  document.querySelector("#waterLevelReadout").textContent = `${fmt(point.level, 1)} m`;
+  storageSummary.innerHTML = [
+    ["情境水位", `${fmt(point.level, 1)} m`, `距溢流口 ${fmt(point.freeboard, 1)} m`, point.freeboard <= 3 ? "danger" : point.freeboard <= 8 ? "warn" : "ok"],
+    ["估算庫容", `${fmt(point.storage10k, 1)} 萬 m³`, `滿水比例 ${fmt(point.percent, 1)}%`, point.percent >= 90 ? "danger" : point.percent >= 70 ? "warn" : "neutral"],
+    ["溢流口", `${fmt(inputs.spillway, 1)} m`, `湖底 ${fmt(inputs.bed, 1)} m`, "neutral"],
+    ["回填 Vw", `${fmt(point.storage10k * 10000, 0)} m³`, "可套入蓄水體積", "ok"]
+  ].map(([label, value, note, cls]) => `
+    <div class="card">
+      <strong>${label}</strong>
+      <b>${value}</b>
+      <span class="tag ${cls}">${note}</span>
+    </div>
+  `).join("");
+
+  renderStorageCharts(storageState);
+}
+
+function renderStorageCharts(state) {
+  const ratio = clamp((state.level - state.bed) / (state.spillway - state.bed), 0, 1);
+  const waterY = 170 - ratio * 95;
+  const spillY = 70;
+  const bedY = 170;
+  const storageX = 42 + clamp(state.percent, 0, 100) / 100 * 310;
+
+  document.querySelector("#storage3d").innerHTML = `
+    <svg viewBox="0 0 420 260" class="storage-svg" role="img" aria-label="三維庫容概念圖">
+      <defs>
+        <linearGradient id="terrainGrad" x1="0" x2="1"><stop offset="0" stop-color="#d5b77a"/><stop offset="1" stop-color="#4a9bab"/></linearGradient>
+      </defs>
+      <polygon points="70,185 145,70 320,95 350,205 150,225" fill="url(#terrainGrad)" opacity=".72"/>
+      <polygon points="125,178 170,112 285,124 315,184 178,202" fill="#2f80c2" opacity=".42"/>
+      <polyline points="90,190 170,112 320,125" fill="none" stroke="#6f5736" stroke-width="3"/>
+      <line x1="95" y1="${waterY}" x2="330" y2="${waterY}" stroke="#2f80c2" stroke-width="3" stroke-dasharray="8 5"/>
+      <line x1="95" y1="${spillY}" x2="330" y2="${spillY}" stroke="#c85252" stroke-width="3"/>
+      <text x="306" y="${waterY - 7}" class="chart-text">水位 ${fmt(state.level, 1)} m</text>
+      <text x="306" y="${spillY - 7}" class="chart-text">溢流口 ${fmt(state.spillway, 1)} m</text>
+      <text x="28" y="235" class="chart-text">3D 概念：以 DEM/DSM 建立水位-庫容關係</text>
+    </svg>
+  `;
+
+  document.querySelector("#longProfileChart").innerHTML = `
+    <svg viewBox="0 0 520 260" class="storage-svg" role="img" aria-label="縱剖面圖">
+      <line x1="45" y1="215" x2="490" y2="215" class="axis-line"/><line x1="45" y1="35" x2="45" y2="215" class="axis-line"/>
+      <path d="M55 ${bedY-35} C125 ${bedY-12},180 ${bedY-30},245 ${bedY-15} S380 ${bedY-70},485 ${bedY-105}" fill="none" stroke="#111827" stroke-width="3"/>
+      <line x1="55" y1="${waterY}" x2="485" y2="${waterY}" stroke="#2f80c2" stroke-width="2" stroke-dasharray="8 5"/>
+      <line x1="55" y1="${spillY}" x2="485" y2="${spillY}" stroke="#c85252" stroke-width="2"/>
+      <rect x="60" y="${waterY}" width="310" height="${215-waterY}" fill="#2f80c2" opacity=".12"/>
+      <text x="58" y="235" class="chart-text">距壩里程（m）</text><text x="12" y="28" class="chart-text">高程</text>
+      <text x="330" y="${waterY-8}" class="chart-text">情境水位</text><text x="365" y="${spillY-8}" class="chart-text">溢流口</text>
+    </svg>
+  `;
+
+  document.querySelector("#crossProfileChart").innerHTML = `
+    <svg viewBox="0 0 520 260" class="storage-svg" role="img" aria-label="橫剖面圖">
+      <line x1="45" y1="215" x2="490" y2="215" class="axis-line"/><line x1="45" y1="35" x2="45" y2="215" class="axis-line"/>
+      <path d="M55 85 C120 120,165 190,250 205 C335 202,385 130,485 70" fill="none" stroke="#111827" stroke-width="3"/>
+      <line x1="55" y1="${waterY}" x2="485" y2="${waterY}" stroke="#2f80c2" stroke-width="2" stroke-dasharray="8 5"/>
+      <polygon points="132,${waterY} 368,${waterY} 300,205 220,205" fill="#2f80c2" opacity=".18"/>
+      <line x1="55" y1="${spillY}" x2="485" y2="${spillY}" stroke="#c85252" stroke-width="2"/>
+      <text x="58" y="235" class="chart-text">左岸 ← 橫向距離 → 右岸</text><text x="330" y="${waterY-8}" class="chart-text">水面</text>
+    </svg>
+  `;
+
+  document.querySelector("#storageCurveChart").innerHTML = `
+    <svg viewBox="0 0 520 260" class="storage-svg" role="img" aria-label="庫容曲線圖">
+      <line x1="50" y1="215" x2="490" y2="215" class="axis-line"/><line x1="50" y1="35" x2="50" y2="215" class="axis-line"/>
+      <path d="M55 210 C135 182,220 145,315 95 S430 55,485 38" fill="none" stroke="#2f80c2" stroke-width="3"/>
+      <line x1="${storageX}" y1="215" x2="${storageX}" y2="${waterY}" stroke="#64748b" stroke-width="2"/>
+      <line x1="50" y1="${waterY}" x2="${storageX}" y2="${waterY}" stroke="#64748b" stroke-width="2" stroke-dasharray="6 5"/>
+      <circle cx="${storageX}" cy="${waterY}" r="7" fill="#2f80c2" stroke="white" stroke-width="2"/>
+      <rect x="50" y="35" width="435" height="26" fill="#fff1c7" opacity=".75"/>
+      <text x="58" y="235" class="chart-text">蓄水量（萬 m³）</text><text x="12" y="28" class="chart-text">水位</text>
+      <text x="270" y="52" class="chart-text">接近溢流警戒區</text>
+      <text x="${Math.min(storageX + 10, 390)}" y="${Math.max(waterY - 10, 28)}" class="chart-text">${fmt(state.level, 1)} m / ${fmt(state.storage10k, 1)} 萬 m³</text>
+    </svg>
+  `;
 }
 
 function getSpatialEstimates() {
@@ -824,6 +943,7 @@ function compute() {
   renderExpertFindings();
   renderReport();
   renderAiSummary();
+  renderStorageAnalysis();
 }
 
 function rowHtml(name, value, cls, note) {
@@ -943,6 +1063,9 @@ function surveyCompleteness() {
 }
 
 function renderReport() {
+  const storageLine = storageState
+    ? `\n補充、庫容剖面情境\n目前情境水位約 ${fmt(storageState.level, 1)} m，估算庫容約 ${fmt(storageState.storage10k, 1)} 萬 m³，距溢流口約 ${fmt(storageState.freeboard, 1)} m；可作為 Vw 與溢流警戒情境之校核。`
+    : "";
   reportText.value = `【${latest.caseName}｜堰塞湖緊急調查與風險評估摘要】
 
 一、案件概況
@@ -955,7 +1078,7 @@ DBI = ${fmt(latest.dbi)}，AHWL_Dis = ${fmt(latest.ahwlDis)}，HDSI = ${fmt(late
 以蓄水體積 ${fmt(latest.VW, 0)} m³ 與潰壩歷時 ${fmt(latest.TcHr, 1)} hr 進行洪峰流量初估，代表洪峰流量約 ${fmt(latest.qpSelected, 0)} m³/s，代表斷面水深約 ${fmt(latest.waterDepth, 1)} m；保全危害度判定為「${latest.exposure}」。
 
 四、初步致災風險與處置建議
-依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。`;
+依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。${storageLine}`;
 }
 
 function renderAiSummary() {
@@ -970,13 +1093,17 @@ function renderAiSummary() {
 }
 
 function keyMetricLines() {
-  return [
+  const lines = [
     `案件：${latest.caseName}`,
     `風險：${latest.risk}；潰壩危險度 ${latest.dangerLevel}；保全危害度 ${latest.exposure}`,
     `壩體：HDmin ${fmt(latest.H, 1)} m、WD ${fmt(latest.W, 1)} m、LDTop ${fmt(latest.L, 1)} m、VD ${fmt(latest.VD, 0)} m³`,
     `崩塌：AL ${fmt(num("landslideArea"), 0)} m²、VL ${fmt(latest.VL, 0)} m³；河床坡降 S ${fmt(latest.S, 4)} m/m`,
     `水理：蓄水量 ${fmt(latest.VW, 0)} m³、估算洪峰 ${fmt(latest.qpSelected, 0)} m³/s、代表水深 ${fmt(latest.waterDepth, 1)} m`
   ];
+  if (storageState) {
+    lines.push(`庫容情境：水位 ${fmt(storageState.level, 1)} m、庫容 ${fmt(storageState.storage10k, 1)} 萬 m³、距溢流口 ${fmt(storageState.freeboard, 1)} m`);
+  }
+  return lines;
 }
 
 function missingDataAdvice() {
@@ -1092,6 +1219,25 @@ function handleSpatialEstimateInput() {
   autoImportSpatialEstimates("推估條件調整後，");
 }
 
+function handleStorageInput(event) {
+  if (event?.target?.id === "currentWaterLevel") {
+    document.querySelector("#waterLevelSlider").value = event.target.value;
+  }
+  if (event?.target?.id === "waterLevelSlider") {
+    document.querySelector("#currentWaterLevel").value = event.target.value;
+  }
+  renderStorageAnalysis();
+  renderReport();
+}
+
+function applyStorageToSurvey() {
+  renderStorageAnalysis();
+  if (!storageState || !form.elements.waterVolume) return;
+  form.elements.waterVolume.value = storageState.storageM3.toFixed(0);
+  compute();
+  showPage("risk");
+}
+
 function setElevationTarget(target) {
   const select = document.querySelector("#elevationTarget");
   if (select && elevationTargetLabels[target]) select.value = target;
@@ -1143,6 +1289,11 @@ document.querySelector("#copyReport").addEventListener("click", async () => {
   document.querySelector("#copyReport").textContent = "已複製";
   setTimeout(() => (document.querySelector("#copyReport").textContent = "複製摘要"), 1200);
 });
+["waterLevelSlider", "currentWaterLevel", "lakeBedElevation", "spillwayElevation", "maxStorageVolume", "storageExponent"].forEach((id) => {
+  const input = document.querySelector(`#${id}`);
+  if (input) input.addEventListener("input", handleStorageInput);
+});
+document.querySelector("#applyStorageToSurvey").addEventListener("click", applyStorageToSurvey);
 document.querySelector("#generateAiReply").addEventListener("click", () => renderExpertReply());
 document.querySelector("#clearAiQuestion").addEventListener("click", () => {
   aiQuestion.value = "";

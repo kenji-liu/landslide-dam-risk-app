@@ -700,6 +700,68 @@ input, select, textarea {
   margin-bottom: 16px;
 }
 
+.storage-controls {
+  margin-bottom: 16px;
+}
+
+.water-level-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.water-level-control input {
+  width: 100%;
+}
+
+.water-level-control strong {
+  min-width: 110px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #0f6e82;
+  background: #e8f7f8;
+  text-align: center;
+}
+
+.storage-inputs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.storage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.storage-visual {
+  min-height: 330px;
+}
+
+.storage-svg {
+  display: block;
+  width: 100%;
+  min-height: 240px;
+}
+
+.axis-line {
+  stroke: #9fb3c4;
+  stroke-width: 1.5;
+}
+
+.chart-text {
+  fill: #24445c;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.storage-notes {
+  margin-top: 16px;
+}
+
 .tablelike {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -1261,9 +1323,10 @@ input, select, textarea {
   .nav-item span { font-size: 16px; }
   .sidebar-footer { display: none; }
   .main-content { margin-left: 78px; }
-  .cards, .module-grid, .result-grid, .gis-layout, .steps, .figure-strip, .figure-gallery, .criteria-grid { grid-template-columns: 1fr 1fr; }
+  .cards, .module-grid, .result-grid, .gis-layout, .steps, .figure-strip, .figure-gallery, .criteria-grid, .storage-grid { grid-template-columns: 1fr 1fr; }
   .gis-layout { grid-template-columns: minmax(0, 1fr); }
   .layer-panel { max-height: none; }
+  .storage-inputs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .expert-panel { grid-template-columns: 1fr; }
   .expert-heading { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 14px; }
   fieldset { grid-template-columns: 1fr 1fr; }
@@ -1287,7 +1350,7 @@ input, select, textarea {
     display: grid;
     align-items: stretch;
   }
-  .cards, .module-grid, .result-grid, .gis-layout, .steps, fieldset, .figure-strip, .figure-gallery, .criteria-grid, .estimate-inputs {
+  .cards, .module-grid, .result-grid, .gis-layout, .steps, fieldset, .figure-strip, .figure-gallery, .criteria-grid, .estimate-inputs, .storage-grid, .storage-inputs, .water-level-control {
     grid-template-columns: 1fr;
   }
   .satellite-panel,
