@@ -1576,6 +1576,25 @@ input, select, textarea {
   background: #fff;
   object-fit: contain;
 }
+.monitor-locator {
+  margin: 14px 0 18px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #d9e2ec;
+  background: #fff;
+}
+.monitor-locator img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.monitor-locator-caption {
+  margin: 0;
+  padding: 10px 14px;
+  color: #70869a;
+  font-size: 12px;
+  background: #f8fbff;
+}
 .monitor-add-form { margin-top: 12px; }
 .monitor-add-actions {
   display: flex;
