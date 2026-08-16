@@ -20,8 +20,10 @@
       <button class="nav-item" data-page="survey"><span>▣</span> 調查參數</button>
       <button class="nav-item" data-page="risk"><span>▤</span> 風險演算</button>
       <button class="nav-item" data-page="storage"><span>庫</span> 庫容剖面</button>
+      <button class="nav-item" data-page="model3d"><span>3D</span> 3D 模型</button>
       <button class="nav-item" data-page="figures"><span>圖</span> 示意圖庫</button>
       <button class="nav-item" data-page="gis"><span>◎</span> 空間研判</button>
+      <button class="nav-item" data-page="monitor"><span>雷</span> SAR監測</button>
       <button class="nav-item" data-page="report"><span>▨</span> 通報報告</button>
       <button class="nav-item" data-page="ai"><span>AI</span> 專家摘要</button>
       <div class="sidebar-footer">水土保持 · UAV · GIS · 風險治理</div>
@@ -225,6 +227,67 @@
         </section>
       </section>
 
+      <section class="page" id="model3d">
+        <div class="toolbar-card">
+          <div>
+            <h2>3D 模型資料</h2>
+            <p>整合 UAV 三維建模、DSM/DEM、點雲與堰塞壩模型資訊，作為壩體幾何、庫容剖面與現地判釋的佐證資料。</p>
+          </div>
+          <button id="apply3dModelToReport" type="button">納入報告摘要</button>
+        </div>
+        <div class="model3d-layout">
+          <article class="module-card model3d-viewer">
+            <div class="model3d-scene" aria-label="堰塞湖 3D 模型概念預覽">
+              <div class="model3d-grid"></div>
+              <div class="model3d-terrain">
+                <span class="model3d-lake"></span>
+                <span class="model3d-dam"></span>
+                <span class="model3d-slide"></span>
+                <span class="model3d-flow"></span>
+              </div>
+              <span class="model3d-label lake">蓄水區</span>
+              <span class="model3d-label dam">堰塞壩</span>
+              <span class="model3d-label slide">崩塌源區</span>
+            </div>
+            <div id="model3dSummary" class="model3d-summary"></div>
+          </article>
+          <article class="module-card model3d-form-card">
+            <h3>模型資料登錄</h3>
+            <div class="model3d-form">
+              <label>模型名稱<input id="model3dName" value="馬太鞍溪堰塞湖 UAV 三維模型" /></label>
+              <label>資料型態
+                <select id="model3dType">
+                  <option>UAV 實景三維模型</option>
+                  <option>DSM/DEM 地形模型</option>
+                  <option>點雲 LAS/LAZ</option>
+                  <option>GLB/OBJ 網格模型</option>
+                  <option>Cesium 3D Tiles</option>
+                </select>
+              </label>
+              <label>模型檔案或雲端連結<input id="model3dLink" placeholder="例：assets/models/matayan_dam.glb 或雲端網址" /></label>
+              <label>座標系統<input id="model3dCrs" value="TWD97 / TM2 zone 121 或 WGS84" /></label>
+              <label>高程基準<input id="model3dDatum" value="正高/橢球高需註明，建議與 DEM、現地水尺一致" /></label>
+              <label>解析度 / 點雲密度<input id="model3dResolution" value="UAV 正射 5-10 cm；DSM 20-50 cm；點雲需註明 pts/m²" /></label>
+              <label>建模日期<input id="model3dDate" type="date" /></label>
+              <label>主要用途
+                <select id="model3dPurpose">
+                  <option>壩體幾何量測與剖面校核</option>
+                  <option>崩塌體積與堆積體差分</option>
+                  <option>庫容曲線與水位情境</option>
+                  <option>通報簡報與現地協調展示</option>
+                </select>
+              </label>
+            </div>
+          </article>
+        </div>
+        <section class="criteria-grid model3d-notes">
+          <article><strong>可納入資料</strong><p>GLB/OBJ 模型、LAS/LAZ 點雲、DSM/DEM、正射影像、剖面線與水位面；大型資料建議放雲端後以連結管理。</p></article>
+          <article><strong>專家判釋重點</strong><p>確認壩頂溢流點、壩體左右岸接合、崩塌堆積厚度、可能滲流出水與下游沖刷通道。</p></article>
+          <article><strong>品質檢核</strong><p>模型需註明拍攝日期、座標系統、高程基準、解析度、控制點精度與遮蔽區，避免與風險參數混用。</p></article>
+          <article><strong>與平台串接</strong><p>3D 模型可支援 HDmin、WD、LDTop、VD、VL、庫容曲線與通報展示，後續可升級為真正 GLB/3D Tiles 檢視器。</p></article>
+        </section>
+      </section>
+
       <section class="page" id="figures">
         <div class="toolbar-card">
           <div>
@@ -329,6 +392,24 @@
             <p>HDmin 取溢流控制點與原河床高程差；S 取壩址上下游代表河段高程差除以沿河道量測長度。</p>
           </article>
         </section>
+      </section>
+
+      <section class="page" id="monitor">
+        <div class="toolbar-card">
+          <div>
+            <h2>SAR振幅監測</h2>
+            <p>以Sentinel-1振幅時序方法持續追蹤壩區與周邊監測點，偵測「疑似積水/堵河」訊號。狀態由本機監測程式(sar_monitor.py)定期產生後發布，本頁不即時運算。</p>
+          </div>
+          <span id="monitorUpdated" class="monitor-updated"></span>
+        </div>
+        <div id="monitorCards" class="cards metric-cards"></div>
+        <div id="monitorCharts" class="figure-strip monitor-charts"></div>
+        <div class="toolbar-card">
+          <div>
+            <h3>使用限制</h3>
+            <p>門檻只由馬太鞍溪這一個事件率定，尚未在其他案例驗證通用性；只對「積水」訊號可靠；永久水體/地形陰影可能誤報；觸發黃色或紅色後仍需人工調閱光學影像、安排UAV複查，本頁不做自動告警。</p>
+          </div>
+        </div>
       </section>
 
       <section class="page" id="report">

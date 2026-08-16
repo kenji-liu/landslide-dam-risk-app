@@ -762,6 +762,189 @@ input, select, textarea {
   margin-top: 16px;
 }
 
+.model3d-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.15fr) minmax(320px, .85fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.model3d-viewer,
+.model3d-form-card {
+  min-height: 520px;
+}
+
+.model3d-scene {
+  position: relative;
+  min-height: 360px;
+  overflow: hidden;
+  border: 1px solid #c6d9e7;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(235,248,255,.9), rgba(255,255,255,.9)),
+    #eef6fb;
+  perspective: 900px;
+}
+
+.model3d-grid {
+  position: absolute;
+  inset: 38px 24px 40px;
+  transform: rotateX(58deg) rotateZ(-18deg);
+  transform-origin: center;
+  background-image:
+    linear-gradient(rgba(47,128,194,.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47,128,194,.18) 1px, transparent 1px);
+  background-size: 28px 28px;
+  border: 1px solid rgba(47,128,194,.22);
+}
+
+.model3d-terrain {
+  position: absolute;
+  left: 15%;
+  top: 34%;
+  width: 70%;
+  height: 42%;
+  transform: rotateX(58deg) rotateZ(-18deg);
+  transform-style: preserve-3d;
+}
+
+.model3d-terrain::before {
+  content: "";
+  position: absolute;
+  inset: 4% 4% 12%;
+  clip-path: polygon(0 70%, 18% 26%, 42% 8%, 64% 18%, 100% 48%, 88% 88%, 36% 96%);
+  background: linear-gradient(120deg, #8fbf8d, #d8c088 52%, #7a8f68);
+  box-shadow: 0 24px 40px rgba(18,48,68,.18);
+}
+
+.model3d-lake,
+.model3d-dam,
+.model3d-slide,
+.model3d-flow {
+  position: absolute;
+  display: block;
+}
+
+.model3d-lake {
+  left: 16%;
+  top: 42%;
+  width: 42%;
+  height: 24%;
+  border-radius: 50%;
+  background: rgba(47,128,194,.45);
+  border: 2px solid rgba(47,128,194,.72);
+}
+
+.model3d-dam {
+  left: 48%;
+  top: 47%;
+  width: 18%;
+  height: 22%;
+  transform: rotate(8deg);
+  background: #b58b55;
+  border: 2px solid #8b683c;
+  border-radius: 55% 35% 48% 42%;
+}
+
+.model3d-slide {
+  left: 54%;
+  top: 20%;
+  width: 28%;
+  height: 28%;
+  clip-path: polygon(10% 0, 82% 22%, 100% 78%, 24% 100%, 0 46%);
+  background: rgba(200,82,82,.45);
+  border: 2px solid rgba(200,82,82,.85);
+}
+
+.model3d-flow {
+  left: 60%;
+  top: 58%;
+  width: 38%;
+  height: 9%;
+  border-radius: 999px;
+  background: rgba(42,167,165,.42);
+  transform: rotate(7deg);
+}
+
+.model3d-label {
+  position: absolute;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #123044;
+  background: rgba(255,255,255,.88);
+  border: 1px solid #c6d9e7;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 6px 16px rgba(18,48,68,.12);
+}
+
+.model3d-label.lake { left: 17%; top: 32%; }
+.model3d-label.dam { left: 55%; top: 58%; }
+.model3d-label.slide { right: 12%; top: 22%; }
+
+.model3d-summary {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fcff;
+}
+
+.model3d-summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.model3d-summary h3 {
+  margin-bottom: 8px;
+}
+
+.model3d-summary p {
+  margin-bottom: 7px;
+  color: #385a72;
+}
+
+.model3d-link {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 10px 0;
+  padding: 9px 10px;
+  border: 1px solid #cbd7e4;
+  border-radius: 8px;
+  color: #0f5685;
+  background: white;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.model3d-link.empty {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.model3d-quality {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.model3d-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.model3d-form label:nth-child(3),
+.model3d-form label:nth-child(5),
+.model3d-form label:nth-child(6) {
+  grid-column: 1 / -1;
+}
+
+.model3d-notes {
+  margin-top: 16px;
+}
+
 .tablelike {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -1323,10 +1506,11 @@ input, select, textarea {
   .nav-item span { font-size: 16px; }
   .sidebar-footer { display: none; }
   .main-content { margin-left: 78px; }
-  .cards, .module-grid, .result-grid, .gis-layout, .steps, .figure-strip, .figure-gallery, .criteria-grid, .storage-grid { grid-template-columns: 1fr 1fr; }
+  .cards, .module-grid, .result-grid, .gis-layout, .steps, .figure-strip, .figure-gallery, .criteria-grid, .storage-grid, .model3d-layout { grid-template-columns: 1fr 1fr; }
   .gis-layout { grid-template-columns: minmax(0, 1fr); }
   .layer-panel { max-height: none; }
   .storage-inputs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .model3d-layout { grid-template-columns: minmax(0, 1fr); }
   .expert-panel { grid-template-columns: 1fr; }
   .expert-heading { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 0 14px; }
   fieldset { grid-template-columns: 1fr 1fr; }
@@ -1350,7 +1534,7 @@ input, select, textarea {
     display: grid;
     align-items: stretch;
   }
-  .cards, .module-grid, .result-grid, .gis-layout, .steps, fieldset, .figure-strip, .figure-gallery, .criteria-grid, .estimate-inputs, .storage-grid, .storage-inputs, .water-level-control {
+  .cards, .module-grid, .result-grid, .gis-layout, .steps, fieldset, .figure-strip, .figure-gallery, .criteria-grid, .estimate-inputs, .storage-grid, .storage-inputs, .water-level-control, .model3d-layout, .model3d-form {
     grid-template-columns: 1fr;
   }
   .satellite-panel,
@@ -1369,4 +1553,26 @@ input, select, textarea {
   .top-bar { position: static; box-shadow: none; }
   .page { display: none; }
   #report { display: block; }
+}
+
+/* SAR監測頁 */
+.monitor-updated {
+  display: block;
+  margin-top: 4px;
+  color: #70869a;
+  font-size: 12px;
+}
+.monitor-reason {
+  display: block;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #4b5567;
+  background: #f2f7fb;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.monitor-charts .figure-card img {
+  background: #fff;
+  object-fit: contain;
 }

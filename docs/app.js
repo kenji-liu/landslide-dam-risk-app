@@ -9,14 +9,17 @@ const expertFindings = document.querySelector("#expertFindings");
 const aiQuestion = document.querySelector("#aiQuestion");
 const aiReply = document.querySelector("#aiReply");
 const storageSummary = document.querySelector("#storageSummary");
+const model3dSummary = document.querySelector("#model3dSummary");
 
 const pageTitles = {
   dashboard: "專家總覽",
   survey: "調查參數",
   risk: "風險演算",
   storage: "庫容剖面",
+  model3d: "3D 模型",
   figures: "示意圖庫",
   gis: "空間研判",
+  monitor: "SAR監測",
   report: "通報報告",
   ai: "專家摘要"
 };
@@ -44,6 +47,8 @@ const matayanPreset = {
 
 let latest = {};
 let storageState = null;
+let model3dState = null;
+let model3dReportEnabled = true;
 
 const matayanLocation = {
   name: "馬太鞍溪堰塞湖",
@@ -477,6 +482,85 @@ function renderStorageCharts(state) {
       <text x="${Math.min(storageX + 10, 390)}" y="${Math.max(waterY - 10, 28)}" class="chart-text">${fmt(state.level, 1)} m / ${fmt(state.storage10k, 1)} 萬 m³</text>
     </svg>
   `;
+}
+
+function getModel3dInputs() {
+  const value = (id) => document.querySelector(`#${id}`)?.value?.trim() || "";
+  return {
+    name: value("model3dName"),
+    type: value("model3dType"),
+    link: value("model3dLink"),
+    crs: value("model3dCrs"),
+    datum: value("model3dDatum"),
+    resolution: value("model3dResolution"),
+    date: value("model3dDate"),
+    purpose: value("model3dPurpose")
+  };
+}
+
+function evaluateModel3dQuality(model) {
+  const checks = [
+    ["模型名稱", model.name],
+    ["資料型態", model.type],
+    ["檔案或連結", model.link],
+    ["座標系統", model.crs],
+    ["高程基準", model.datum],
+    ["解析度/點雲密度", model.resolution],
+    ["建模日期", model.date],
+    ["主要用途", model.purpose]
+  ];
+  const filled = checks.filter(([, value]) => value).length;
+  const score = Math.round(filled / checks.length * 100);
+  const missing = checks.filter(([, value]) => !value).map(([label]) => label);
+  let level = "可供展示";
+  let cls = "warn";
+  if (score >= 88) {
+    level = "可供專家判釋";
+    cls = "ok";
+  } else if (score < 55) {
+    level = "資料待補";
+    cls = "danger";
+  }
+  return { score, level, cls, missing };
+}
+
+function renderModel3dAnalysis() {
+  if (!model3dSummary) return;
+  const model = getModel3dInputs();
+  const quality = evaluateModel3dQuality(model);
+  model3dState = { ...model, ...quality };
+
+  const linkText = model.link
+    ? `<span class="model3d-link">${model.link}</span>`
+    : `<span class="model3d-link empty">尚未填入模型檔案或雲端連結</span>`;
+  const missingText = quality.missing.length
+    ? `建議補齊：${quality.missing.slice(0, 4).join("、")}${quality.missing.length > 4 ? "等" : ""}`
+    : "模型中繼資料完整，可作為壩體幾何與庫容剖面佐證。";
+
+  model3dSummary.innerHTML = `
+    <div class="model3d-summary-head">
+      <span class="tag ${quality.cls}">${quality.level}</span>
+      <strong>${quality.score}%</strong>
+    </div>
+    <h3>${model.name || "未命名 3D 模型"}</h3>
+    <p><b>資料型態：</b>${model.type || "待填"}；<b>用途：</b>${model.purpose || "待填"}</p>
+    <p><b>座標/高程：</b>${model.crs || "待填"}｜${model.datum || "待填"}</p>
+    <p><b>解析度：</b>${model.resolution || "待填"}</p>
+    <p><b>建模日期：</b>${model.date || "待填"}</p>
+    ${linkText}
+    <p class="model3d-quality">${missingText}</p>
+  `;
+}
+
+function apply3dModelToReport() {
+  model3dReportEnabled = true;
+  renderModel3dAnalysis();
+  compute();
+  const button = document.querySelector("#apply3dModelToReport");
+  if (button) {
+    button.textContent = "已納入摘要";
+    setTimeout(() => (button.textContent = "納入報告摘要"), 1400);
+  }
 }
 
 function getSpatialEstimates() {
@@ -941,6 +1025,7 @@ function compute() {
   renderRiskMatrix(exposure, dangerHigh);
   renderDashboard();
   renderExpertFindings();
+  renderModel3dAnalysis();
   renderReport();
   renderAiSummary();
   renderStorageAnalysis();
@@ -1066,6 +1151,9 @@ function renderReport() {
   const storageLine = storageState
     ? `\n補充、庫容剖面情境\n目前情境水位約 ${fmt(storageState.level, 1)} m，估算庫容約 ${fmt(storageState.storage10k, 1)} 萬 m³，距溢流口約 ${fmt(storageState.freeboard, 1)} m；可作為 Vw 與溢流警戒情境之校核。`
     : "";
+  const modelLine = model3dReportEnabled && model3dState
+    ? `\n補充、3D 模型資料\n已登錄「${model3dState.name || "未命名 3D 模型"}」，資料型態為 ${model3dState.type || "待填"}，品質檢核為「${model3dState.level}」(${model3dState.score}%)；可用於 ${model3dState.purpose || "壩體幾何、庫容剖面與通報展示"}。模型資料需持續校核座標系統、高程基準、解析度與拍攝日期。`
+    : "";
   reportText.value = `【${latest.caseName}｜堰塞湖緊急調查與風險評估摘要】
 
 一、案件概況
@@ -1078,7 +1166,7 @@ DBI = ${fmt(latest.dbi)}，AHWL_Dis = ${fmt(latest.ahwlDis)}，HDSI = ${fmt(late
 以蓄水體積 ${fmt(latest.VW, 0)} m³ 與潰壩歷時 ${fmt(latest.TcHr, 1)} hr 進行洪峰流量初估，代表洪峰流量約 ${fmt(latest.qpSelected, 0)} m³/s，代表斷面水深約 ${fmt(latest.waterDepth, 1)} m；保全危害度判定為「${latest.exposure}」。
 
 四、初步致災風險與處置建議
-依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。${storageLine}`;
+依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。${storageLine}${modelLine}`;
 }
 
 function renderAiSummary() {
@@ -1102,6 +1190,9 @@ function keyMetricLines() {
   ];
   if (storageState) {
     lines.push(`庫容情境：水位 ${fmt(storageState.level, 1)} m、庫容 ${fmt(storageState.storage10k, 1)} 萬 m³、距溢流口 ${fmt(storageState.freeboard, 1)} m`);
+  }
+  if (model3dState) {
+    lines.push(`3D 模型：${model3dState.name || "未命名"}，${model3dState.type || "資料型態待填"}，品質 ${model3dState.score}% (${model3dState.level})`);
   }
   return lines;
 }
@@ -1294,6 +1385,14 @@ document.querySelector("#copyReport").addEventListener("click", async () => {
   if (input) input.addEventListener("input", handleStorageInput);
 });
 document.querySelector("#applyStorageToSurvey").addEventListener("click", applyStorageToSurvey);
+["model3dName", "model3dType", "model3dLink", "model3dCrs", "model3dDatum", "model3dResolution", "model3dDate", "model3dPurpose"].forEach((id) => {
+  const input = document.querySelector(`#${id}`);
+  if (input) input.addEventListener("input", () => {
+    renderModel3dAnalysis();
+    renderReport();
+  });
+});
+document.querySelector("#apply3dModelToReport").addEventListener("click", apply3dModelToReport);
 document.querySelector("#generateAiReply").addEventListener("click", () => renderExpertReply());
 document.querySelector("#clearAiQuestion").addEventListener("click", () => {
   aiQuestion.value = "";
@@ -1344,6 +1443,43 @@ document.querySelector("#basemapSelect").addEventListener("change", (event) => {
   el.addEventListener("click", () => selectSpatialToolFromParam(el.name));
 });
 
+function renderMonitor() {
+  const cardsEl = document.querySelector("#monitorCards");
+  const chartsEl = document.querySelector("#monitorCharts");
+  const updatedEl = document.querySelector("#monitorUpdated");
+  if (!cardsEl || !chartsEl) return;
+  fetch("./monitor_status.json", { cache: "no-store" })
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    })
+    .then((data) => {
+      if (updatedEl) updatedEl.textContent = `資料更新時間：${data.updated}（本機監測程式產生，非即時運算）`;
+      updatedEl && updatedEl.classList.add("monitor-updated");
+      cardsEl.innerHTML = data.points.map((p) => `
+        <div class="card">
+          <strong>${p.name}</strong>
+          <b>${p.latest}</b>
+          <span class="tag ${p.level_class}">${p.level}</span>
+          <small class="monitor-reason">${p.reason}</small>
+        </div>
+      `).join("");
+      chartsEl.innerHTML = data.points.map((p) => `
+        <article class="figure-card">
+          ${p.chart ? `<img src="./${p.chart}" alt="${p.name}振幅時序" />` : ""}
+          <div><strong>${p.name}</strong><p>${p.note || ""}</p></div>
+        </article>
+      `).join("");
+    })
+    .catch((err) => {
+      cardsEl.innerHTML = "";
+      chartsEl.innerHTML = `<p class="muted-empty">尚未發布監測資料（monitor_status.json 不存在或無法讀取：${err.message}）。請先在本機執行 sar_monitor.py --publish-dir 指向此docs資料夾。</p>`;
+    });
+}
+
 addParameterSketches();
+const modelDateInput = document.querySelector("#model3dDate");
+if (modelDateInput && !modelDateInput.value) modelDateInput.value = new Date().toISOString().slice(0, 10);
 initSpatialMap();
 compute();
+renderMonitor();

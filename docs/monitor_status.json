@@ -1,0 +1,45 @@
+{
+  "updated": "2026-08-16 19:28",
+  "thresholds": {
+    "yellow_db": -10.0,
+    "yellow_run": 2,
+    "red_db": -15.0,
+    "red_run": 3,
+    "red_single_db": -20.0
+  },
+  "points": [
+    {
+      "name": "壩區",
+      "level": "綠色正常",
+      "level_class": "ok",
+      "latest": "+0.8dB (2026-07-24)",
+      "reason": "最新一期 0.8dB，未達關注門檻",
+      "lon": 121.298194,
+      "lat": 23.698951,
+      "note": "堰塞湖壩區座標",
+      "chart": "assets/monitor/chart_壩區.png"
+    },
+    {
+      "name": "SAR異常區",
+      "level": "綠色正常",
+      "level_class": "ok",
+      "latest": "+0.7dB (2026-07-24)",
+      "reason": "最新一期 0.7dB，未達關注門檻",
+      "lon": 121.295004,
+      "lat": 23.700038,
+      "note": "347m核心異常區，兩組獨立配對交叉驗證過",
+      "chart": "assets/monitor/chart_SAR異常區.png"
+    },
+    {
+      "name": "堰塞湖區",
+      "level": "綠色正常",
+      "level_class": "ok",
+      "latest": "+0.1dB (2026-07-24)",
+      "reason": "最新一期 0.1dB，未達關注門檻",
+      "lon": 121.290338,
+      "lat": 23.697331,
+      "note": "官方測量堰塞湖範圍中心（多邊形測量地標.kmz）",
+      "chart": "assets/monitor/chart_堰塞湖區.png"
+    }
+  ]
+}
