@@ -1577,6 +1577,7 @@ input, select, textarea {
   object-fit: contain;
 }
 .monitor-locator {
+  position: relative;
   margin: 14px 0 18px;
   border-radius: 12px;
   overflow: hidden;
@@ -1587,6 +1588,11 @@ input, select, textarea {
   display: block;
   width: 100%;
   height: auto;
+}
+.monitor-map {
+  height: 420px;
+  min-height: 420px;
+  z-index: 1;
 }
 .monitor-locator-caption {
   margin: 0;

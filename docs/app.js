@@ -1289,6 +1289,9 @@ function showPage(pageId) {
   if (pageId === "gis" && spatialState.map) {
     setTimeout(() => spatialState.map.invalidateSize(), 120);
   }
+  if (pageId === "monitor" && monitorMapState.map) {
+    setTimeout(() => monitorMapState.map.invalidateSize(), 120);
+  }
 }
 
 function exportData() {
@@ -1443,11 +1446,51 @@ document.querySelector("#basemapSelect").addEventListener("change", (event) => {
   el.addEventListener("click", () => selectSpatialToolFromParam(el.name));
 });
 
+const monitorMapState = { map: null, markers: [] };
+const monitorLevelColor = { ok: "#257356", warn: "#9a651c", danger: "#a83f46", neutral: "#334155" };
+
+function initMonitorMap() {
+  const mapEl = document.querySelector("#monitorMap");
+  if (!mapEl || monitorMapState.map || !window.L) return;
+  monitorMapState.map = L.map(mapEl, { scrollWheelZoom: true }).setView([23.69852, 121.29586], 16);
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19,
+    attribution: "Tiles &copy; Esri"
+  }).addTo(monitorMapState.map);
+}
+
+function updateMonitorMapMarkers(points) {
+  if (!monitorMapState.map) return;
+  monitorMapState.markers.forEach((m) => monitorMapState.map.removeLayer(m));
+  monitorMapState.markers = [];
+  points.forEach((p) => {
+    if (p.lon == null || p.lat == null) return;
+    const color = monitorLevelColor[p.level_class] || monitorLevelColor.neutral;
+    const marker = L.circleMarker([p.lat, p.lon], {
+      radius: 10, color: "#ffffff", weight: 2, fillColor: color, fillOpacity: 0.9
+    }).addTo(monitorMapState.map);
+    marker.bindPopup(`
+      <div class="spatial-popup">
+        <b>${p.name}</b>
+        <span>${p.latest}</span>
+        <span>${p.level}　${p.reason}</span>
+        ${p.note ? `<span>${p.note}</span>` : ""}
+      </div>
+    `);
+    monitorMapState.markers.push(marker);
+  });
+  if (points.length > 0) {
+    const bounds = L.latLngBounds(points.filter((p) => p.lon != null).map((p) => [p.lat, p.lon]));
+    monitorMapState.map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+  }
+}
+
 function renderMonitor() {
   const cardsEl = document.querySelector("#monitorCards");
   const chartsEl = document.querySelector("#monitorCharts");
   const updatedEl = document.querySelector("#monitorUpdated");
   if (!cardsEl || !chartsEl) return;
+  initMonitorMap();
   fetch("./monitor_status.json", { cache: "no-store" })
     .then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1457,6 +1500,7 @@ function renderMonitor() {
       monitorPublishedPoints = data.points || [];
       if (updatedEl) updatedEl.textContent = `資料更新時間：${data.updated}（本機監測程式產生，非即時運算）`;
       updatedEl && updatedEl.classList.add("monitor-updated");
+      updateMonitorMapMarkers(monitorPublishedPoints);
       cardsEl.innerHTML = data.points.map((p) => `
         <div class="card">
           <strong>${p.name}</strong>
