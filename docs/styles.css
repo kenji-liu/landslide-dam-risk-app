@@ -1584,7 +1584,7 @@ input, select, textarea {
   display: grid;
   grid-template-columns: 1.25fr 0.75fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
   margin: 14px 0 18px;
 }
 .monitor-overview .metric-cards {
@@ -1594,6 +1594,8 @@ input, select, textarea {
 }
 .monitor-locator {
   position: relative;
+  display: flex;
+  flex-direction: column;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #d9e2ec;
@@ -1602,12 +1604,13 @@ input, select, textarea {
 .monitor-locator img {
   display: block;
   width: 100%;
-  height: auto;
-  max-height: 340px;
+  flex: 1 1 auto;
+  min-height: 0;
   object-fit: cover;
   object-position: center;
 }
 .monitor-locator-caption {
+  flex: 0 0 auto;
   margin: 0;
   padding: 10px 14px;
   color: #70869a;
@@ -1616,7 +1619,8 @@ input, select, textarea {
 }
 @media (max-width: 900px) {
   .monitor-overview { grid-template-columns: 1fr; }
-  .monitor-locator img { max-height: none; }
+  .monitor-locator { flex: none; }
+  .monitor-locator img { flex: none; height: 260px; }
 }
 .monitor-add-form { margin-top: 12px; }
 .monitor-add-actions {
