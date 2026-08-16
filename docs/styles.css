@@ -1576,3 +1576,20 @@ input, select, textarea {
   background: #fff;
   object-fit: contain;
 }
+.monitor-add-form { margin-top: 12px; }
+.monitor-add-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 18px;
+}
+.pending-points {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.pending-point-card .remove-pending {
+  margin-top: 8px;
+  align-self: flex-start;
+}

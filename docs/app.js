@@ -1454,6 +1454,7 @@ function renderMonitor() {
       return res.json();
     })
     .then((data) => {
+      monitorPublishedPoints = data.points || [];
       if (updatedEl) updatedEl.textContent = `資料更新時間：${data.updated}（本機監測程式產生，非即時運算）`;
       updatedEl && updatedEl.classList.add("monitor-updated");
       cardsEl.innerHTML = data.points.map((p) => `
@@ -1476,6 +1477,94 @@ function renderMonitor() {
       chartsEl.innerHTML = `<p class="muted-empty">尚未發布監測資料（monitor_status.json 不存在或無法讀取：${err.message}）。請先在本機執行 sar_monitor.py --publish-dir 指向此docs資料夾。</p>`;
     });
 }
+
+// ---- SAR監測：新增監測點（純前端，只產生設定檔，不直接執行分析）----
+let monitorPublishedPoints = [];
+let pendingMonitorPoints = JSON.parse(localStorage.getItem("pendingMonitorPoints") || "[]");
+
+function renderPendingPoints() {
+  const list = document.querySelector("#pendingPointsList");
+  if (!list) return;
+  if (pendingMonitorPoints.length === 0) {
+    list.innerHTML = `<p class="muted-empty">尚未加入任何待新增監測點。</p>`;
+    return;
+  }
+  list.innerHTML = pendingMonitorPoints.map((p, i) => `
+    <div class="card pending-point-card">
+      <strong>${p.name}</strong>
+      <b>${p.lon.toFixed(6)}, ${p.lat.toFixed(6)}</b>
+      <span class="tag neutral">待新增</span>
+      <small class="monitor-reason">${p.note || "（無備註）"}</small>
+      <button type="button" class="outline remove-pending" data-index="${i}">移除</button>
+    </div>
+  `).join("");
+  list.querySelectorAll(".remove-pending").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      pendingMonitorPoints.splice(Number(btn.dataset.index), 1);
+      localStorage.setItem("pendingMonitorPoints", JSON.stringify(pendingMonitorPoints));
+      renderPendingPoints();
+    });
+  });
+}
+
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+document.querySelector("#addPointForm")?.addEventListener("submit", (e) => e.preventDefault());
+
+document.querySelector("#addPointToList")?.addEventListener("click", () => {
+  const form = document.querySelector("#addPointForm");
+  const name = form.pointName.value.trim();
+  const lon = parseFloat(form.pointLon.value);
+  const lat = parseFloat(form.pointLat.value);
+  const note = form.pointNote.value.trim();
+  if (!name || Number.isNaN(lon) || Number.isNaN(lat)) {
+    alert("請填寫名稱、經度、緯度（經緯度需為數字）。");
+    return;
+  }
+  if (lon < 118 || lon > 123 || lat < 21 || lat > 26) {
+    if (!confirm(`座標 (${lon}, ${lat}) 看起來不在台灣本島範圍內，確定要加入嗎？`)) return;
+  }
+  pendingMonitorPoints.push({ name, lon, lat, note });
+  localStorage.setItem("pendingMonitorPoints", JSON.stringify(pendingMonitorPoints));
+  renderPendingPoints();
+  form.reset();
+});
+
+document.querySelector("#downloadPointsJson")?.addEventListener("click", () => {
+  if (pendingMonitorPoints.length === 0) {
+    alert("待新增清單是空的，請先填表單並按「加入待新增清單」。");
+    return;
+  }
+  const merged = [
+    ...monitorPublishedPoints.map((p) => ({ name: p.name, lon: p.lon, lat: p.lat, note: p.note || "" })),
+    ...pendingMonitorPoints,
+  ];
+  downloadTextFile("monitor_points.json", JSON.stringify(merged, null, 2));
+});
+
+document.querySelector("#copyAddPointCmd")?.addEventListener("click", async () => {
+  if (pendingMonitorPoints.length === 0) {
+    alert("待新增清單是空的，請先填表單並按「加入待新增清單」。");
+    return;
+  }
+  const cmds = pendingMonitorPoints.map((p) =>
+    `python sar_monitor.py --raw-dir "<HyP3原始資料夾>" --out-dir monitor_output --add-point "${p.name},${p.lon},${p.lat},${p.note || ""}"`
+  ).join("\n");
+  await navigator.clipboard.writeText(cmds);
+  const btn = document.querySelector("#copyAddPointCmd");
+  const original = btn.textContent;
+  btn.textContent = "已複製到剪貼簿";
+  setTimeout(() => (btn.textContent = original), 1500);
+});
+
+renderPendingPoints();
 
 addParameterSketches();
 const modelDateInput = document.querySelector("#model3dDate");

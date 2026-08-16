@@ -404,6 +404,26 @@
         </div>
         <div id="monitorCards" class="cards metric-cards"></div>
         <div id="monitorCharts" class="figure-strip monitor-charts"></div>
+
+        <div class="toolbar-card">
+          <div>
+            <h3>新增監測點</h3>
+            <p>本頁是靜態網站，沒有後端可以直接執行SAR分析。這裡只負責「產生設定檔」——填好座標後下載，把檔案交給分析端（或取代本機的 monitor_points.json）執行 <code>sar_monitor.py</code>，新地點就會回溯全部歷史配對、之後跟其他點一起自動更新。</p>
+          </div>
+        </div>
+        <form id="addPointForm" class="form-grid monitor-add-form">
+          <label class="param-field" data-icon="名">監測點名稱<input name="pointName" type="text" placeholder="例：大馬4" required /><small class="field-help">建議跟現地慣用名稱一致，之後圖表與報告都會用這個名稱。</small></label>
+          <label class="param-field" data-icon="經">經度 Longitude<input name="pointLon" type="number" step="0.000001" placeholder="例：121.29xxxx" required /><small class="field-help">WGS84十進位經度，可從Google地圖右鍵「這是哪裡」複製。</small></label>
+          <label class="param-field" data-icon="緯">緯度 Latitude<input name="pointLat" type="number" step="0.000001" placeholder="例：23.70xxxx" required /><small class="field-help">WGS84十進位緯度。</small></label>
+          <label class="param-field" data-icon="註">備註<input name="pointNote" type="text" placeholder="例：官方右岸崩滑潛勢區" /><small class="field-help">選填，會顯示在監測卡片下方。</small></label>
+        </form>
+        <div class="toolbar-actions monitor-add-actions">
+          <button id="addPointToList" type="button">加入待新增清單</button>
+          <button id="downloadPointsJson" type="button" class="outline">下載更新後的 monitor_points.json</button>
+          <button id="copyAddPointCmd" type="button" class="outline">複製 --add-point 指令</button>
+        </div>
+        <div id="pendingPointsList" class="pending-points"></div>
+
         <div class="toolbar-card">
           <div>
             <h3>使用限制</h3>
