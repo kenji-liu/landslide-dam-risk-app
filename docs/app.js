@@ -1289,9 +1289,6 @@ function showPage(pageId) {
   if (pageId === "gis" && spatialState.map) {
     setTimeout(() => spatialState.map.invalidateSize(), 120);
   }
-  if (pageId === "monitor" && monitorMapState.map) {
-    setTimeout(() => monitorMapState.map.invalidateSize(), 120);
-  }
 }
 
 function exportData() {
@@ -1446,76 +1443,11 @@ document.querySelector("#basemapSelect").addEventListener("change", (event) => {
   el.addEventListener("click", () => selectSpatialToolFromParam(el.name));
 });
 
-const monitorMapState = { map: null, markers: [] };
-const monitorLevelColor = { ok: "#257356", warn: "#9a651c", danger: "#a83f46", neutral: "#334155" };
-
-function initMonitorMap() {
-  const mapEl = document.querySelector("#monitorMap");
-  if (!mapEl || monitorMapState.map || !window.L) return;
-  monitorMapState.map = L.map(mapEl, { scrollWheelZoom: true }).setView([23.69852, 121.29586], 16);
-  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-    maxZoom: 19,
-    attribution: "Tiles &copy; Esri"
-  }).addTo(monitorMapState.map);
-}
-
-// 依名稱給固定形狀＋色調，跟先前的靜態定位圖(壩區=星形黃、SAR異常區=圓形紅、
-// 堰塞湖區=方形橙)保持一致；不在清單內的新點（例如之後加的大馬4）預設用三角形。
-const monitorPointStyle = {
-  "壩區": { shape: "star", color: "#f5c518" },
-  "SAR異常區": { shape: "circle", color: "#e53935" },
-  "堰塞湖區": { shape: "square", color: "#f08a3c" },
-};
-const monitorShapeSvg = {
-  star: (c) => `<svg width="30" height="30" viewBox="0 0 30 30"><polygon points="15,2 18.5,11 28,11 20.3,17 23.2,26.5 15,20.8 6.8,26.5 9.7,17 2,11 11.5,11" fill="${c}" stroke="#1c2531" stroke-width="1.5"/></svg>`,
-  circle: (c) => `<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="10" fill="none" stroke="${c}" stroke-width="3.5"/></svg>`,
-  square: (c) => `<svg width="26" height="26" viewBox="0 0 26 26"><rect x="4" y="4" width="18" height="18" fill="none" stroke="${c}" stroke-width="3.5"/></svg>`,
-  triangle: (c) => `<svg width="28" height="28" viewBox="0 0 28 28"><polygon points="14,3 26,24 2,24" fill="none" stroke="${c}" stroke-width="3.5"/></svg>`,
-};
-
-function updateMonitorMapMarkers(points) {
-  if (!monitorMapState.map) return;
-  monitorMapState.markers.forEach((m) => monitorMapState.map.removeLayer(m));
-  monitorMapState.markers = [];
-  points.forEach((p) => {
-    if (p.lon == null || p.lat == null) return;
-    const style = monitorPointStyle[p.name] || { shape: "triangle", color: monitorLevelColor[p.level_class] || "#334155" };
-    const svg = monitorShapeSvg[style.shape](style.color);
-    const icon = L.divIcon({
-      className: "monitor-marker-icon",
-      html: svg,
-      iconSize: [30, 30],
-      iconAnchor: [15, 15],
-    });
-    const marker = L.marker([p.lat, p.lon], { icon }).addTo(monitorMapState.map);
-    marker.bindTooltip(p.name, {
-      permanent: true,
-      direction: "top",
-      offset: [0, -14],
-      className: `monitor-marker-label monitor-marker-label-${style.shape}`,
-    });
-    marker.bindPopup(`
-      <div class="spatial-popup">
-        <b>${p.name}</b>
-        <span>${p.latest}</span>
-        <span>${p.level}　${p.reason}</span>
-        ${p.note ? `<span>${p.note}</span>` : ""}
-      </div>
-    `);
-    monitorMapState.markers.push(marker);
-  });
-  if (points.length > 0) {
-    const bounds = L.latLngBounds(points.filter((p) => p.lon != null).map((p) => [p.lat, p.lon]));
-    monitorMapState.map.fitBounds(bounds, { padding: [50, 60], maxZoom: 17 });
-  }
-}
-
 function renderMonitor() {
   const cardsEl = document.querySelector("#monitorCards");
   const chartsEl = document.querySelector("#monitorCharts");
   const updatedEl = document.querySelector("#monitorUpdated");
   if (!cardsEl || !chartsEl) return;
-  initMonitorMap();
   fetch("./monitor_status.json", { cache: "no-store" })
     .then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1525,7 +1457,6 @@ function renderMonitor() {
       monitorPublishedPoints = data.points || [];
       if (updatedEl) updatedEl.textContent = `資料更新時間：${data.updated}（本機監測程式產生，非即時運算）`;
       updatedEl && updatedEl.classList.add("monitor-updated");
-      updateMonitorMapMarkers(monitorPublishedPoints);
       cardsEl.innerHTML = data.points.map((p) => `
         <div class="card">
           <strong>${p.name}</strong>
