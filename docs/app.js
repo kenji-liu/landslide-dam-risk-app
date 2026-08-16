@@ -1459,16 +1459,41 @@ function initMonitorMap() {
   }).addTo(monitorMapState.map);
 }
 
+// 依名稱給固定形狀＋色調，跟先前的靜態定位圖(壩區=星形黃、SAR異常區=圓形紅、
+// 堰塞湖區=方形橙)保持一致；不在清單內的新點（例如之後加的大馬4）預設用三角形。
+const monitorPointStyle = {
+  "壩區": { shape: "star", color: "#f5c518" },
+  "SAR異常區": { shape: "circle", color: "#e53935" },
+  "堰塞湖區": { shape: "square", color: "#f08a3c" },
+};
+const monitorShapeSvg = {
+  star: (c) => `<svg width="30" height="30" viewBox="0 0 30 30"><polygon points="15,2 18.5,11 28,11 20.3,17 23.2,26.5 15,20.8 6.8,26.5 9.7,17 2,11 11.5,11" fill="${c}" stroke="#1c2531" stroke-width="1.5"/></svg>`,
+  circle: (c) => `<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="10" fill="none" stroke="${c}" stroke-width="3.5"/></svg>`,
+  square: (c) => `<svg width="26" height="26" viewBox="0 0 26 26"><rect x="4" y="4" width="18" height="18" fill="none" stroke="${c}" stroke-width="3.5"/></svg>`,
+  triangle: (c) => `<svg width="28" height="28" viewBox="0 0 28 28"><polygon points="14,3 26,24 2,24" fill="none" stroke="${c}" stroke-width="3.5"/></svg>`,
+};
+
 function updateMonitorMapMarkers(points) {
   if (!monitorMapState.map) return;
   monitorMapState.markers.forEach((m) => monitorMapState.map.removeLayer(m));
   monitorMapState.markers = [];
   points.forEach((p) => {
     if (p.lon == null || p.lat == null) return;
-    const color = monitorLevelColor[p.level_class] || monitorLevelColor.neutral;
-    const marker = L.circleMarker([p.lat, p.lon], {
-      radius: 10, color: "#ffffff", weight: 2, fillColor: color, fillOpacity: 0.9
-    }).addTo(monitorMapState.map);
+    const style = monitorPointStyle[p.name] || { shape: "triangle", color: monitorLevelColor[p.level_class] || "#334155" };
+    const svg = monitorShapeSvg[style.shape](style.color);
+    const icon = L.divIcon({
+      className: "monitor-marker-icon",
+      html: svg,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+    });
+    const marker = L.marker([p.lat, p.lon], { icon }).addTo(monitorMapState.map);
+    marker.bindTooltip(p.name, {
+      permanent: true,
+      direction: "top",
+      offset: [0, -14],
+      className: `monitor-marker-label monitor-marker-label-${style.shape}`,
+    });
     marker.bindPopup(`
       <div class="spatial-popup">
         <b>${p.name}</b>
@@ -1481,7 +1506,7 @@ function updateMonitorMapMarkers(points) {
   });
   if (points.length > 0) {
     const bounds = L.latLngBounds(points.filter((p) => p.lon != null).map((p) => [p.lat, p.lon]));
-    monitorMapState.map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+    monitorMapState.map.fitBounds(bounds, { padding: [50, 60], maxZoom: 17 });
   }
 }
 

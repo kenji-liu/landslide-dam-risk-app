@@ -1594,6 +1594,21 @@ input, select, textarea {
   min-height: 420px;
   z-index: 1;
 }
+.monitor-marker-icon { background: none; border: none; }
+.leaflet-tooltip.monitor-marker-label {
+  background: rgba(20, 24, 31, 0.78);
+  border: none;
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: #f5c518;
+  box-shadow: none;
+}
+.leaflet-tooltip.monitor-marker-label::before { display: none; }
+.leaflet-tooltip.monitor-marker-label-circle { color: #ff6b60; }
+.leaflet-tooltip.monitor-marker-label-square { color: #ffab5e; }
+.leaflet-tooltip.monitor-marker-label-triangle { color: #9fb4c9; }
 .monitor-locator-caption {
   margin: 0;
   padding: 10px 14px;
