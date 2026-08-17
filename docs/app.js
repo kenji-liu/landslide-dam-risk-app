@@ -1448,6 +1448,7 @@ function renderMonitor() {
   const chartsEl = document.querySelector("#monitorCharts");
   const updatedEl = document.querySelector("#monitorUpdated");
   if (!cardsEl || !chartsEl) return;
+  initMonitorLocalPanel();
   fetch("./monitor_status.json", { cache: "no-store" })
     .then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1476,6 +1477,63 @@ function renderMonitor() {
       cardsEl.innerHTML = "";
       chartsEl.innerHTML = `<p class="muted-empty">尚未發布監測資料（monitor_status.json 不存在或無法讀取：${err.message}）。請先在本機執行 sar_monitor.py --publish-dir 指向此docs資料夾。</p>`;
     });
+}
+
+// ---- SAR監測：本機分析觸發（呼叫run_monitor_server.py，只在localhost開啟時顯示）----
+const MONITOR_LOCAL_API = "http://127.0.0.1:8899";
+
+function isLocalMonitorHost() {
+  return ["localhost", "127.0.0.1"].includes(window.location.hostname);
+}
+
+function setMonitorLocalLog(text) {
+  const log = document.querySelector("#monitorLocalLog");
+  if (log) log.textContent = text;
+}
+
+function setMonitorLocalButtonsDisabled(disabled) {
+  ["#monitorRunBtn", "#monitorPushBtn"].forEach((sel) => {
+    const btn = document.querySelector(sel);
+    if (btn) btn.disabled = disabled;
+  });
+}
+
+function callMonitorLocalApi(path, busyText) {
+  setMonitorLocalButtonsDisabled(true);
+  setMonitorLocalLog(busyText);
+  return fetch(`${MONITOR_LOCAL_API}${path}`, { method: "POST" })
+    .then((res) => res.json())
+    .then((data) => {
+      setMonitorLocalLog(`${data.ok ? "[完成]" : "[失敗]"}\n${data.log || ""}`);
+      return data;
+    })
+    .catch((err) => {
+      setMonitorLocalLog(`[連線失敗] 尚未偵測到本機分析服務。請先在本機執行：\npython run_monitor_server.py\n\n錯誤訊息：${err.message}`);
+      return null;
+    })
+    .finally(() => setMonitorLocalButtonsDisabled(false));
+}
+
+function initMonitorLocalPanel() {
+  const panel = document.querySelector("#monitorLocalPanel");
+  if (!panel || !isLocalMonitorHost()) return;
+  panel.hidden = false;
+  const runBtn = document.querySelector("#monitorRunBtn");
+  const pushBtn = document.querySelector("#monitorPushBtn");
+  if (runBtn && !runBtn.dataset.bound) {
+    runBtn.dataset.bound = "1";
+    runBtn.addEventListener("click", () => {
+      callMonitorLocalApi("/run", "執行中，重新掃描新配對並更新趨勢圖，可能要一點時間...").then((data) => {
+        if (data && data.ok) renderMonitor();
+      });
+    });
+  }
+  if (pushBtn && !pushBtn.dataset.bound) {
+    pushBtn.dataset.bound = "1";
+    pushBtn.addEventListener("click", () => {
+      callMonitorLocalApi("/push", "推送中...");
+    });
+  }
 }
 
 // ---- SAR監測：新增監測點（純前端，只產生設定檔，不直接執行分析）----

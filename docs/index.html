@@ -402,6 +402,17 @@
           </div>
           <span id="monitorUpdated" class="monitor-updated"></span>
         </div>
+        <div id="monitorLocalPanel" class="toolbar-card monitor-local-panel" hidden>
+          <div>
+            <h3>本機分析（僅限本機開啟時可用）</h3>
+            <p>偵測到你是用 localhost 開啟這頁，可以直接觸發本機的 <code>sar_monitor.py</code> 重新分析，不用等每天08:00排程。「推送到GitHub」會讓公開網站同步更新，請先確認結果沒問題再按。</p>
+          </div>
+          <div class="monitor-local-actions">
+            <button id="monitorRunBtn" type="button">立即重新分析</button>
+            <button id="monitorPushBtn" type="button" class="outline">推送到GitHub（公開網站更新）</button>
+          </div>
+          <pre id="monitorLocalLog" class="monitor-local-log"></pre>
+        </div>
         <div class="monitor-overview">
           <div class="monitor-locator">
             <img src="./assets/monitor/monitor_locator_map.png" alt="監測點位置圖：壩區、SAR異常區、堰塞湖區" />

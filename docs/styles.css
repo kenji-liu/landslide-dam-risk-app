@@ -1622,6 +1622,27 @@ input, select, textarea {
   .monitor-locator { flex: none; }
   .monitor-locator img { flex: none; height: 260px; }
 }
+.monitor-local-panel { margin: 14px 0; border: 1px dashed #c8b23a; background: #fffdf3; }
+.monitor-local-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.monitor-local-log {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  max-height: 220px;
+  overflow: auto;
+  background: #14181f;
+  color: #cfe8d8;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.monitor-local-log:empty { display: none; }
 .monitor-add-form { margin-top: 12px; }
 .monitor-add-actions {
   display: flex;
