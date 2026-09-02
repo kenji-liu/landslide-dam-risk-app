@@ -331,11 +331,34 @@
               </select>
             </label>
             <div class="copernicus-tools">
-              <strong>Copernicus Data Space</strong>
-              <p>Sentinel-2 L2A｜2026-04-14｜False Color｜雲量 30%</p>
-              <div>
-                <button id="focusCopernicus" type="button" class="outline">定位 Copernicus 範圍</button>
-                <button id="openCopernicusCurrentTab" type="button">本頁開啟圖台</button>
+              <strong>Sentinel-2 影像時間軸（Copernicus Data Space）</strong>
+              <p id="sentinelHubStatus" class="sentinel-hub-status">尚未設定連線，點下方「連線設定」開始。</p>
+              <div class="sentinel-hub-controls">
+                <label>影像日期<input id="sentinelHubDate" type="date" /></label>
+                <label>影像類型
+                  <select id="sentinelHubLayer">
+                    <option value="TRUE_COLOR">真彩色 True Color</option>
+                    <option value="FALSE_COLOR" selected>假色 False Color（裸露/植生對比較明顯）</option>
+                  </select>
+                </label>
+              </div>
+              <div class="sentinel-hub-actions">
+                <button id="sentinelHubToggle" type="button">套用到地圖</button>
+                <button id="sentinelHubSettingsBtn" type="button" class="outline">連線設定</button>
+                <button id="focusCopernicus" type="button" class="outline">定位範圍</button>
+                <button id="openCopernicusCurrentTab" type="button" class="outline">另開圖台比對</button>
+              </div>
+              <div id="sentinelHubSettings" class="sentinel-hub-settings" hidden>
+                <p class="sentinel-hub-help">以下三格只存在您這台電腦的瀏覽器（localStorage），不會送出、也不會進GitHub。到
+                  <a href="https://shapps.dataspace.copernicus.eu/dashboard/" target="_blank" rel="noopener">Copernicus Dashboard</a>
+                  → User Settings → OAuth clients 建立一組「SPA」型態的Client；再到 Configuration Utility 用 Sentinel-2 L2A 範本建一個 Configuration，取得 Instance ID。</p>
+                <label>Client ID<input id="shClientId" type="text" autocomplete="off" /></label>
+                <label>Client Secret<input id="shClientSecret" type="password" autocomplete="off" /></label>
+                <label>Instance ID（WMS Configuration）<input id="shInstanceId" type="text" autocomplete="off" /></label>
+                <div class="sentinel-hub-actions">
+                  <button id="shSaveCreds" type="button">儲存</button>
+                  <button id="shClearCreds" type="button" class="outline">清除</button>
+                </div>
               </div>
             </div>
             <label>高程套用目標

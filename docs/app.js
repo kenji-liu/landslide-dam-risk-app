@@ -898,6 +898,7 @@ function initSpatialMap() {
   spatialState.map.on("moveend", updateCopernicusLinks);
   updateCopernicusLinks();
   setMeasurementMode("landslide");
+  initSentinelHubPanel();
 }
 
 function tagClass(level) {
@@ -1441,6 +1442,187 @@ document.querySelector("#basemapSelect").addEventListener("change", (event) => {
 [...form.elements].filter((el) => el.name).forEach((el) => {
   el.addEventListener("focus", () => selectSpatialToolFromParam(el.name));
   el.addEventListener("click", () => selectSpatialToolFromParam(el.name));
+});
+
+// ---- 空間研判：Sentinel Hub（Copernicus Data Space）可切換日期的衛星影像圖層 ----
+// 憑證只存這台瀏覽器的 localStorage，不進原始碼、不進git，符合「不經手使用者密鑰」的規則。
+const SH_TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
+const SH_WMS_BASE = "https://sh.dataspace.copernicus.eu/ogc/wms";
+let shTokenCache = null; // { token, expiresAt }
+let shWmsLayer = null;
+
+function getSentinelHubCreds() {
+  return {
+    clientId: localStorage.getItem("shClientId") || "",
+    clientSecret: localStorage.getItem("shClientSecret") || "",
+    instanceId: localStorage.getItem("shInstanceId") || "",
+  };
+}
+
+function setSentinelHubStatus(text, level) {
+  const el = document.querySelector("#sentinelHubStatus");
+  if (!el) return;
+  el.textContent = text;
+  el.className = `sentinel-hub-status${level ? ` ${level}` : ""}`;
+}
+
+async function getSentinelHubToken() {
+  const { clientId, clientSecret } = getSentinelHubCreds();
+  if (!clientId || !clientSecret) {
+    throw new Error("尚未設定 Client ID / Client Secret，請按「連線設定」輸入。");
+  }
+  const now = Date.now();
+  if (shTokenCache && shTokenCache.expiresAt - 30000 > now) {
+    return shTokenCache.token;
+  }
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+  });
+  const res = await fetch(SH_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (!res.ok) {
+    throw new Error(`OAuth 認證失敗 HTTP ${res.status}，請確認 Client ID / Client Secret 是否正確`);
+  }
+  const data = await res.json();
+  shTokenCache = { token: data.access_token, expiresAt: now + data.expires_in * 1000 };
+  return shTokenCache.token;
+}
+
+const SentinelHubWmsLayer = window.L ? L.TileLayer.WMS.extend({
+  createTile(coords, done) {
+    const tile = document.createElement("img");
+    tile.setAttribute("role", "presentation");
+    const url = this.getTileUrl(coords);
+    let cancelled = false;
+    getSentinelHubToken()
+      .then((token) => fetch(url, { headers: { Authorization: `Bearer ${token}` } }))
+      .then((res) => {
+        if (!res.ok) throw new Error(`影像圖磚讀取失敗 HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        const objUrl = URL.createObjectURL(blob);
+        tile.onload = () => { URL.revokeObjectURL(objUrl); done(null, tile); };
+        tile.onerror = () => done(new Error("圖磚解碼失敗"), tile);
+        tile.src = objUrl;
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSentinelHubStatus(`載入失敗：${err.message}`, "danger");
+          done(err, tile);
+        }
+      });
+    tile._shCancel = () => { cancelled = true; };
+    return tile;
+  },
+}) : null;
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function applySentinelHubLayer() {
+  if (!spatialState.map || !SentinelHubWmsLayer) return;
+  const { instanceId } = getSentinelHubCreds();
+  if (!instanceId) {
+    setSentinelHubStatus("尚未設定 Instance ID，請按「連線設定」輸入。", "danger");
+    return;
+  }
+  const dateInput = document.querySelector("#sentinelHubDate");
+  const dateStr = dateInput.value || todayIsoDate();
+  dateInput.value = dateStr;
+  const layerId = document.querySelector("#sentinelHubLayer").value;
+
+  if (shWmsLayer) {
+    spatialState.map.removeLayer(shWmsLayer);
+    shWmsLayer = null;
+  }
+  setSentinelHubStatus(`載入中：${dateStr}（${layerId === "TRUE_COLOR" ? "真彩色" : "假色"}）...`, "warn");
+  shWmsLayer = new SentinelHubWmsLayer(`${SH_WMS_BASE}/${instanceId}`, {
+    layers: layerId,
+    format: "image/png",
+    transparent: false,
+    version: "1.3.0",
+    time: `${dateStr}/${dateStr}`,
+    maxZoom: 19,
+    attribution: "Sentinel-2 &copy; Copernicus / ESA, via Copernicus Data Space Ecosystem",
+  });
+  let hadTileError = false;
+  shWmsLayer.on("tileerror", (e) => {
+    hadTileError = true;
+    const msg = e.error && /401|403/.test(e.error.message || "")
+      ? "認證失敗，請確認 Client ID / Client Secret / Instance ID 是否正確。"
+      : `${dateStr} 這天可能沒有可用影像（雲遮或未過境），試試前後幾天。`;
+    setSentinelHubStatus(msg, "danger");
+  });
+  shWmsLayer.on("load", () => {
+    if (hadTileError) return;
+    setSentinelHubStatus(`已套用：${dateStr}（${layerId === "TRUE_COLOR" ? "真彩色" : "假色"}）`, "ok");
+  });
+  shWmsLayer.addTo(spatialState.map);
+}
+
+function removeSentinelHubLayer() {
+  if (shWmsLayer && spatialState.map) {
+    spatialState.map.removeLayer(shWmsLayer);
+  }
+  shWmsLayer = null;
+  setSentinelHubStatus("已移除衛星影像圖層。", null);
+}
+
+function initSentinelHubPanel() {
+  const dateInput = document.querySelector("#sentinelHubDate");
+  if (dateInput && !dateInput.value) dateInput.value = todayIsoDate();
+  const { clientId, clientSecret, instanceId } = getSentinelHubCreds();
+  document.querySelector("#shClientId").value = clientId;
+  document.querySelector("#shClientSecret").value = clientSecret;
+  document.querySelector("#shInstanceId").value = instanceId;
+  if (clientId && clientSecret && instanceId) {
+    setSentinelHubStatus("已設定連線，按「套用到地圖」載入影像。", "ok");
+  }
+}
+
+document.querySelector("#sentinelHubToggle").addEventListener("click", () => {
+  if (shWmsLayer) {
+    removeSentinelHubLayer();
+    document.querySelector("#sentinelHubToggle").textContent = "套用到地圖";
+  } else {
+    applySentinelHubLayer();
+    document.querySelector("#sentinelHubToggle").textContent = shWmsLayer ? "移除影像圖層" : "套用到地圖";
+  }
+});
+document.querySelector("#sentinelHubDate").addEventListener("change", () => {
+  if (shWmsLayer) applySentinelHubLayer();
+});
+document.querySelector("#sentinelHubLayer").addEventListener("change", () => {
+  if (shWmsLayer) applySentinelHubLayer();
+});
+document.querySelector("#sentinelHubSettingsBtn").addEventListener("click", () => {
+  const panel = document.querySelector("#sentinelHubSettings");
+  panel.hidden = !panel.hidden;
+});
+document.querySelector("#shSaveCreds").addEventListener("click", () => {
+  localStorage.setItem("shClientId", document.querySelector("#shClientId").value.trim());
+  localStorage.setItem("shClientSecret", document.querySelector("#shClientSecret").value.trim());
+  localStorage.setItem("shInstanceId", document.querySelector("#shInstanceId").value.trim());
+  shTokenCache = null;
+  setSentinelHubStatus("已儲存連線設定，按「套用到地圖」試試。", "ok");
+});
+document.querySelector("#shClearCreds").addEventListener("click", () => {
+  ["shClientId", "shClientSecret", "shInstanceId"].forEach((k) => localStorage.removeItem(k));
+  document.querySelector("#shClientId").value = "";
+  document.querySelector("#shClientSecret").value = "";
+  document.querySelector("#shInstanceId").value = "";
+  shTokenCache = null;
+  removeSentinelHubLayer();
+  document.querySelector("#sentinelHubToggle").textContent = "套用到地圖";
+  setSentinelHubStatus("已清除連線設定。", null);
 });
 
 function renderMonitor() {

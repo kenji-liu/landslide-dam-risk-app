@@ -1151,11 +1151,57 @@ input, select, textarea {
   font-size: 12px;
 }
 
-.copernicus-tools div {
+.sentinel-hub-controls {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  margin-bottom: 8px;
 }
+.sentinel-hub-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sentinel-hub-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.sentinel-hub-status {
+  font-weight: 600;
+}
+.sentinel-hub-status.ok { color: #257356; }
+.sentinel-hub-status.warn { color: #9a651c; }
+.sentinel-hub-status.danger { color: #a83f46; }
+.sentinel-hub-settings {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #cfe0ea;
+  display: grid;
+  gap: 8px;
+}
+.sentinel-hub-settings[hidden] { display: none; }
+.sentinel-hub-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sentinel-hub-settings input {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.sentinel-hub-help {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.sentinel-hub-help a { color: #1d6fa5; }
 
 .measure-tools,
 .measure-actions {
