@@ -1169,6 +1169,13 @@ input, select, textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
+.sentinel-hub-date-results {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  background: #fff;
+}
 .sentinel-hub-status {
   font-weight: 600;
 }

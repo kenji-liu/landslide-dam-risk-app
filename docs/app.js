@@ -1568,6 +1568,70 @@ function applySentinelHubLayer() {
   shWmsLayer.addTo(spatialState.map);
 }
 
+const SH_CATALOG_URL = "https://sh.dataspace.copernicus.eu/catalog/v1/search";
+
+async function searchSentinelHubDates() {
+  if (!spatialState.map) return;
+  const resultsSelect = document.querySelector("#sentinelHubDateResults");
+  const searchBtn = document.querySelector("#sentinelHubSearchDates");
+  const bounds = spatialState.map.getBounds();
+  const bbox = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
+  const end = new Date();
+  const start = new Date(end.getTime() - 180 * 24 * 3600 * 1000);
+  searchBtn.disabled = true;
+  resultsSelect.disabled = true;
+  resultsSelect.innerHTML = "<option>搜尋中...</option>";
+  setSentinelHubStatus("搜尋過去180天內、目前地圖範圍的可用影像...", "warn");
+  try {
+    const token = await getSentinelHubToken();
+    const res = await fetch(SH_CATALOG_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bbox,
+        datetime: `${start.toISOString()}/${end.toISOString()}`,
+        collections: ["sentinel-2-l2a"],
+        limit: 100,
+      }),
+    });
+    if (!res.ok) throw new Error(`搜尋失敗 HTTP ${res.status}`);
+    const data = await res.json();
+    const byDate = new Map();
+    (data.features || []).forEach((f) => {
+      const date = (f.properties.datetime || "").slice(0, 10);
+      const cloud = f.properties["eo:cloud_cover"];
+      if (!date) return;
+      const prev = byDate.get(date);
+      if (!prev || (cloud != null && cloud < prev)) byDate.set(date, cloud);
+    });
+    const dates = [...byDate.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
+    if (dates.length === 0) {
+      resultsSelect.innerHTML = "<option>過去180天無可用影像</option>";
+      setSentinelHubStatus("目前地圖範圍過去180天內查不到Sentinel-2影像，試著縮小/移動地圖範圍再搜尋一次。", "danger");
+      return;
+    }
+    resultsSelect.innerHTML = dates.map(([date, cloud]) =>
+      `<option value="${date}">${date}${cloud != null ? `（雲量${Math.round(cloud)}%）` : ""}</option>`
+    ).join("");
+    resultsSelect.disabled = false;
+    setSentinelHubStatus(`找到 ${dates.length} 個可用日期，從下拉選單選一個。`, "ok");
+  } catch (err) {
+    resultsSelect.innerHTML = "<option>搜尋失敗</option>";
+    setSentinelHubStatus(`搜尋可用日期失敗：${err.message}`, "danger");
+  } finally {
+    searchBtn.disabled = false;
+  }
+}
+
+document.querySelector("#sentinelHubSearchDates").addEventListener("click", searchSentinelHubDates);
+document.querySelector("#sentinelHubDateResults").addEventListener("change", (event) => {
+  const date = event.target.value;
+  if (!date || date.length !== 10) return;
+  document.querySelector("#sentinelHubDate").value = date;
+  applySentinelHubLayer();
+  document.querySelector("#sentinelHubToggle").textContent = shWmsLayer ? "移除影像圖層" : "套用到地圖";
+});
+
 function removeSentinelHubLayer() {
   if (shWmsLayer && spatialState.map) {
     spatialState.map.removeLayer(shWmsLayer);
