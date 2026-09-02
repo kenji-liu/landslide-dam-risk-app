@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-02 08:32",
+  "updated": "2026-09-02 08:39",
   "thresholds": {
     "yellow_db": -10.0,
     "yellow_run": 2,
@@ -17,7 +17,8 @@
       "lon": 121.298194,
       "lat": 23.698951,
       "note": "堰塞湖壩區座標",
-      "chart": "assets/monitor/chart_壩區.png"
+      "chart": "assets/monitor/chart_壩區.png",
+      "data": "assets/monitor/data_壩區.json"
     },
     {
       "name": "SAR異常區",
@@ -28,7 +29,8 @@
       "lon": 121.295004,
       "lat": 23.700038,
       "note": "347m核心異常區，兩組獨立配對交叉驗證過",
-      "chart": "assets/monitor/chart_SAR異常區.png"
+      "chart": "assets/monitor/chart_SAR異常區.png",
+      "data": "assets/monitor/data_SAR異常區.json"
     },
     {
       "name": "堰塞湖區",
@@ -39,7 +41,8 @@
       "lon": 121.290338,
       "lat": 23.697331,
       "note": "官方測量堰塞湖範圍中心（多邊形測量地標.kmz）",
-      "chart": "assets/monitor/chart_堰塞湖區.png"
+      "chart": "assets/monitor/chart_堰塞湖區.png",
+      "data": "assets/monitor/data_堰塞湖區.json"
     }
   ]
 }

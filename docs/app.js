@@ -1456,6 +1456,7 @@ function renderMonitor() {
     })
     .then((data) => {
       monitorPublishedPoints = data.points || [];
+      monitorThresholds = data.thresholds || null;
       if (updatedEl) updatedEl.textContent = `資料更新時間：${data.updated}（本機監測程式產生，非即時運算）`;
       updatedEl && updatedEl.classList.add("monitor-updated");
       cardsEl.innerHTML = data.points.map((p) => `
@@ -1469,9 +1470,16 @@ function renderMonitor() {
       chartsEl.innerHTML = data.points.map((p) => `
         <article class="figure-card">
           ${p.chart ? `<img src="./${p.chart}" alt="${p.name}振幅時序" />` : ""}
-          <div><strong>${p.name}</strong><p>${p.note || ""}</p></div>
+          <div>
+            <strong>${p.name}</strong>
+            <p>${p.note || ""}</p>
+            ${p.data ? `<button type="button" class="outline monitor-data-btn" data-name="${p.name}" data-src="${p.data}">查看資料表</button>` : ""}
+          </div>
         </article>
       `).join("");
+      chartsEl.querySelectorAll(".monitor-data-btn").forEach((btn) => {
+        btn.addEventListener("click", () => openMonitorDataModal(btn.dataset.name, btn.dataset.src));
+      });
     })
     .catch((err) => {
       cardsEl.innerHTML = "";
@@ -1538,7 +1546,57 @@ function initMonitorLocalPanel() {
 
 // ---- SAR監測：新增監測點（純前端，只產生設定檔，不直接執行分析）----
 let monitorPublishedPoints = [];
+let monitorThresholds = null;
 let pendingMonitorPoints = JSON.parse(localStorage.getItem("pendingMonitorPoints") || "[]");
+
+function formatMonitorDate(yyyymmdd) {
+  if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd;
+  return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
+}
+
+function openMonitorDataModal(name, src) {
+  const modal = document.querySelector("#monitorDataModal");
+  const title = document.querySelector("#monitorDataModalTitle");
+  const meta = document.querySelector("#monitorDataModalMeta");
+  const body = document.querySelector("#monitorDataModalBody");
+  if (!modal || !body) return;
+  title.textContent = `${name}　振幅資料表`;
+  meta.textContent = "載入中...";
+  body.innerHTML = "";
+  modal.hidden = false;
+  fetch(`./${src}`, { cache: "no-store" })
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    })
+    .then((rows) => {
+      const sorted = [...rows].sort((a, b) => (a.ref_date < b.ref_date ? 1 : -1));
+      const yellow = monitorThresholds ? monitorThresholds.yellow_db : null;
+      const red = monitorThresholds ? monitorThresholds.red_db : null;
+      meta.textContent = `共 ${sorted.length} 筆配對觀測（依參考期新到舊排序）。紅色＝低於紅色查證門檻${red != null ? `(${red}dB)` : ""}，橙色＝低於黃色關注門檻${yellow != null ? `(${yellow}dB)` : ""}。`;
+      body.innerHTML = sorted.map((r) => {
+        const cls = red != null && r.diff_dB < red ? "data-row-red"
+          : yellow != null && r.diff_dB < yellow ? "data-row-yellow" : "";
+        return `<tr class="${cls}"><td>${formatMonitorDate(r.ref_date)}</td><td>${formatMonitorDate(r.sec_date)}</td><td>${r.diff_dB.toFixed(2)}</td></tr>`;
+      }).join("");
+    })
+    .catch((err) => {
+      meta.textContent = `讀取失敗：${err.message}`;
+    });
+}
+
+function closeMonitorDataModal() {
+  const modal = document.querySelector("#monitorDataModal");
+  if (modal) modal.hidden = true;
+}
+
+document.querySelector("#monitorDataModalClose")?.addEventListener("click", closeMonitorDataModal);
+document.querySelector("#monitorDataModal")?.addEventListener("click", (e) => {
+  if (e.target.id === "monitorDataModal") closeMonitorDataModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeMonitorDataModal();
+});
 
 function renderPendingPoints() {
   const list = document.querySelector("#pendingPointsList");

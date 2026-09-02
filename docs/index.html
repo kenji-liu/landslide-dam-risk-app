@@ -422,6 +422,24 @@
         </div>
         <div id="monitorCharts" class="figure-strip monitor-charts"></div>
 
+        <div id="monitorDataModal" class="modal-overlay" hidden>
+          <div class="modal-panel" role="dialog" aria-modal="true">
+            <div class="modal-header">
+              <h3 id="monitorDataModalTitle">振幅資料表</h3>
+              <button id="monitorDataModalClose" type="button" class="modal-close" aria-label="關閉">✕</button>
+            </div>
+            <p id="monitorDataModalMeta" class="modal-meta"></p>
+            <div class="modal-body">
+              <table class="monitor-data-table">
+                <thead>
+                  <tr><th>參考期</th><th>比對期</th><th>核心區−背景 (dB)</th></tr>
+                </thead>
+                <tbody id="monitorDataModalBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <div class="toolbar-card">
           <div>
             <h3>新增監測點</h3>
