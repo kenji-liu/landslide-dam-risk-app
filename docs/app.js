@@ -1733,9 +1733,9 @@ function renderMonitor() {
         </div>
       `).join("");
       chartsEl.innerHTML = data.points.map((p) => `
-        <article class="figure-card">
-          ${p.chart ? `<img src="./${p.chart}" alt="${p.name}振幅時序" />` : ""}
-          <div>
+        <article class="figure-card monitor-chart-card">
+          ${p.data ? `<section class="monitor-interactive-chart" data-monitor-chart data-name="${p.name}" data-src="${p.data}" data-fallback="${p.chart || ""}" aria-label="${p.name}互動式振幅時序圖"><div class="monitor-chart-loading">載入互動圖表…</div></section>` : (p.chart ? `<img src="./${p.chart}" alt="${p.name}振幅時序" />` : "")}
+          <div class="monitor-chart-caption">
             <strong>${p.name}</strong>
             <p>${p.note || ""}</p>
             ${p.data ? `<button type="button" class="outline monitor-data-btn" data-name="${p.name}" data-src="${p.data}">查看資料表</button>` : ""}
@@ -1745,6 +1745,7 @@ function renderMonitor() {
       chartsEl.querySelectorAll(".monitor-data-btn").forEach((btn) => {
         btn.addEventListener("click", () => openMonitorDataModal(btn.dataset.name, btn.dataset.src));
       });
+      initMonitorInteractiveCharts(chartsEl);
     })
     .catch((err) => {
       cardsEl.innerHTML = "";
@@ -1817,6 +1818,232 @@ let pendingMonitorPoints = JSON.parse(localStorage.getItem("pendingMonitorPoints
 function formatMonitorDate(yyyymmdd) {
   if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd;
   return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
+}
+
+function monitorDateMs(yyyymmdd) {
+  if (!yyyymmdd || yyyymmdd.length !== 8) return NaN;
+  return Date.UTC(Number(yyyymmdd.slice(0, 4)), Number(yyyymmdd.slice(4, 6)) - 1, Number(yyyymmdd.slice(6, 8)));
+}
+
+function monitorSvgElement(name, attributes = {}) {
+  const element = document.createElementNS("http://www.w3.org/2000/svg", name);
+  Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, String(value)));
+  return element;
+}
+
+function monitorAlertLabel(value) {
+  const yellow = monitorThresholds?.yellow_db ?? -10;
+  const red = monitorThresholds?.red_db ?? -15;
+  if (value < red) return { label: "紅色查證", className: "danger" };
+  if (value < yellow) return { label: "黃色關注", className: "warn" };
+  return { label: "一般範圍", className: "ok" };
+}
+
+function initMonitorInteractiveCharts(root) {
+  root.querySelectorAll("[data-monitor-chart]").forEach((container) => {
+    fetch(`./${container.dataset.src}`, { cache: "no-store" })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((rows) => buildMonitorInteractiveChart(container, rows))
+      .catch((err) => {
+        const fallback = container.dataset.fallback;
+        container.innerHTML = fallback
+          ? `<img src="./${fallback}" alt="${container.dataset.name}振幅時序（靜態備援）" />`
+          : `<p class="muted-empty">互動圖表載入失敗：${err.message}</p>`;
+      });
+  });
+}
+
+function buildMonitorInteractiveChart(container, sourceRows) {
+  const rows = sourceRows
+    .map((row) => ({ ...row, time: monitorDateMs(row.sec_date), diff_dB: Number(row.diff_dB) }))
+    .filter((row) => Number.isFinite(row.time) && Number.isFinite(row.diff_dB))
+    .sort((a, b) => a.time - b.time || a.ref_date.localeCompare(b.ref_date));
+  if (!rows.length) throw new Error("沒有可繪製的配對資料");
+
+  container.innerHTML = `
+    <div class="monitor-chart-toolbar">
+      <div class="monitor-range-buttons" role="group" aria-label="顯示期間">
+        <button type="button" class="active" data-range="all">全部</button>
+        <button type="button" data-range="365">近一年</button>
+        <button type="button" data-range="183">近半年</button>
+      </div>
+      <button type="button" class="monitor-play-button" aria-pressed="false">▶ 逐期播放</button>
+    </div>
+    <div class="monitor-chart-viewport">
+      <svg class="monitor-chart-svg" viewBox="0 0 720 320" role="img" aria-label="${container.dataset.name}振幅時序互動圖"></svg>
+      <div class="monitor-chart-tooltip" hidden></div>
+    </div>
+    <div class="monitor-chart-detail" aria-live="polite"></div>
+  `;
+
+  const svg = container.querySelector(".monitor-chart-svg");
+  const viewport = container.querySelector(".monitor-chart-viewport");
+  const tooltip = container.querySelector(".monitor-chart-tooltip");
+  const detail = container.querySelector(".monitor-chart-detail");
+  const playButton = container.querySelector(".monitor-play-button");
+  const state = { range: "all", visibleRows: rows, timer: null, playIndex: 0, selectedCircle: null };
+  const width = 720;
+  const height = 320;
+  const margin = { top: 26, right: 28, bottom: 48, left: 58 };
+
+  function updateDetail(row, prefix = "選取點位") {
+    const alert = monitorAlertLabel(row.diff_dB);
+    detail.innerHTML = `
+      <span>${prefix}</span>
+      <strong>${row.diff_dB >= 0 ? "+" : ""}${row.diff_dB.toFixed(2)} dB</strong>
+      <small>${formatMonitorDate(row.ref_date)} → ${formatMonitorDate(row.sec_date)}</small>
+      <em class="${alert.className}">${alert.label}</em>
+    `;
+  }
+
+  function stopPlayback() {
+    if (state.timer) window.clearInterval(state.timer);
+    state.timer = null;
+    playButton.textContent = "▶ 逐期播放";
+    playButton.setAttribute("aria-pressed", "false");
+    svg.querySelectorAll(".playback").forEach((node) => node.classList.remove("playback"));
+  }
+
+  function render() {
+    stopPlayback();
+    svg.replaceChildren();
+    const maxTimeAll = Math.max(...rows.map((row) => row.time));
+    const cutoff = state.range === "all" ? -Infinity : maxTimeAll - Number(state.range) * 86400000;
+    const visible = rows.filter((row) => row.time >= cutoff);
+    state.visibleRows = visible;
+
+    const xMinRaw = Math.min(...visible.map((row) => row.time));
+    const xMaxRaw = Math.max(...visible.map((row) => row.time));
+    const xMin = xMinRaw === xMaxRaw ? xMinRaw - 86400000 : xMinRaw;
+    const xMax = xMinRaw === xMaxRaw ? xMaxRaw + 86400000 : xMaxRaw;
+    const yellow = monitorThresholds?.yellow_db ?? -10;
+    const red = monitorThresholds?.red_db ?? -15;
+    const values = visible.map((row) => row.diff_dB).concat([yellow, red]);
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const yPadding = Math.max(3, (rawMax - rawMin) * 0.12);
+    const yMin = Math.floor((rawMin - yPadding) / 5) * 5;
+    const yMax = Math.ceil((rawMax + yPadding) / 5) * 5;
+    const plotWidth = width - margin.left - margin.right;
+    const plotHeight = height - margin.top - margin.bottom;
+    const x = (time) => margin.left + ((time - xMin) / (xMax - xMin)) * plotWidth;
+    const y = (value) => margin.top + ((yMax - value) / (yMax - yMin)) * plotHeight;
+
+    const grid = monitorSvgElement("g", { class: "monitor-chart-grid" });
+    for (let i = 0; i <= 5; i += 1) {
+      const value = yMin + ((yMax - yMin) * i) / 5;
+      const yy = y(value);
+      grid.append(monitorSvgElement("line", { x1: margin.left, x2: width - margin.right, y1: yy, y2: yy }));
+      const label = monitorSvgElement("text", { x: margin.left - 10, y: yy + 4, "text-anchor": "end" });
+      label.textContent = value.toFixed(0);
+      grid.append(label);
+    }
+    for (let i = 0; i <= 4; i += 1) {
+      const time = xMin + ((xMax - xMin) * i) / 4;
+      const xx = x(time);
+      grid.append(monitorSvgElement("line", { x1: xx, x2: xx, y1: margin.top, y2: height - margin.bottom }));
+      const date = new Date(time);
+      const label = monitorSvgElement("text", { x: xx, y: height - 22, "text-anchor": "middle" });
+      label.textContent = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+      grid.append(label);
+    }
+    svg.append(grid);
+
+    [{ value: yellow, className: "yellow", label: `黃色 ${yellow}dB` }, { value: red, className: "red", label: `紅色 ${red}dB` }].forEach((threshold) => {
+      const yy = y(threshold.value);
+      svg.append(monitorSvgElement("line", { class: `monitor-threshold ${threshold.className}`, x1: margin.left, x2: width - margin.right, y1: yy, y2: yy }));
+      const label = monitorSvgElement("text", { class: `monitor-threshold-label ${threshold.className}`, x: width - margin.right - 4, y: yy - 5, "text-anchor": "end" });
+      label.textContent = threshold.label;
+      svg.append(label);
+    });
+
+    const line = monitorSvgElement("polyline", {
+      class: "monitor-series-line",
+      points: visible.map((row) => `${x(row.time).toFixed(2)},${y(row.diff_dB).toFixed(2)}`).join(" "),
+    });
+    svg.append(line);
+
+    const pointsGroup = monitorSvgElement("g", { class: "monitor-series-points" });
+    visible.forEach((row, index) => {
+      const alert = monitorAlertLabel(row.diff_dB);
+      const circle = monitorSvgElement("circle", {
+        class: `monitor-point ${alert.className}${index === visible.length - 1 ? " latest" : ""}`,
+        cx: x(row.time), cy: y(row.diff_dB), r: 3.5, tabindex: 0,
+        role: "button",
+        "aria-label": `${formatMonitorDate(row.ref_date)}到${formatMonitorDate(row.sec_date)}，${row.diff_dB.toFixed(2)} dB，${alert.label}`,
+      });
+      const showTooltip = (event) => {
+        tooltip.hidden = false;
+        tooltip.textContent = `${formatMonitorDate(row.ref_date)} → ${formatMonitorDate(row.sec_date)}｜${row.diff_dB >= 0 ? "+" : ""}${row.diff_dB.toFixed(2)} dB`;
+        const rect = viewport.getBoundingClientRect();
+        const px = event?.clientX ? event.clientX - rect.left : (Number(circle.getAttribute("cx")) / width) * rect.width;
+        const py = event?.clientY ? event.clientY - rect.top : (Number(circle.getAttribute("cy")) / height) * rect.height;
+        tooltip.style.left = `${Math.min(Math.max(px, 80), rect.width - 80)}px`;
+        tooltip.style.top = `${Math.max(py - 12, 24)}px`;
+        updateDetail(row);
+      };
+      circle.addEventListener("pointerenter", showTooltip);
+      circle.addEventListener("pointermove", showTooltip);
+      circle.addEventListener("pointerleave", () => { tooltip.hidden = true; });
+      circle.addEventListener("click", () => {
+        state.selectedCircle?.classList.remove("selected");
+        state.selectedCircle = circle;
+        circle.classList.add("selected");
+        updateDetail(row, "已固定點位");
+      });
+      circle.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          circle.click();
+          showTooltip();
+        }
+      });
+      pointsGroup.append(circle);
+    });
+    svg.append(pointsGroup);
+
+    const axisLabel = monitorSvgElement("text", { class: "monitor-axis-label", x: 16, y: height / 2, transform: `rotate(-90 16 ${height / 2})`, "text-anchor": "middle" });
+    axisLabel.textContent = "核心區－背景（dB）";
+    svg.append(axisLabel);
+    updateDetail(visible[visible.length - 1], "最新點位");
+  }
+
+  container.querySelectorAll("[data-range]").forEach((button) => {
+    button.addEventListener("click", () => {
+      container.querySelectorAll("[data-range]").forEach((item) => item.classList.toggle("active", item === button));
+      state.range = button.dataset.range;
+      render();
+    });
+  });
+
+  playButton.addEventListener("click", () => {
+    if (state.timer) {
+      stopPlayback();
+      return;
+    }
+    state.playIndex = 0;
+    playButton.textContent = "❚❚ 暫停";
+    playButton.setAttribute("aria-pressed", "true");
+    const circles = [...svg.querySelectorAll(".monitor-point")];
+    state.timer = window.setInterval(() => {
+      circles.forEach((circle) => circle.classList.remove("playback"));
+      const circle = circles[state.playIndex];
+      const row = state.visibleRows[state.playIndex];
+      if (!circle || !row) {
+        stopPlayback();
+        return;
+      }
+      circle.classList.add("playback");
+      updateDetail(row, `播放 ${state.playIndex + 1}/${state.visibleRows.length}`);
+      state.playIndex += 1;
+      if (state.playIndex >= state.visibleRows.length) stopPlayback();
+    }, 90);
+  });
+
+  render();
 }
 
 function openMonitorDataModal(name, src) {
