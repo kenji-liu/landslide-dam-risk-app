@@ -20,6 +20,7 @@ const pageTitles = {
   figures: "示意圖庫",
   gis: "空間研判",
   monitor: "SAR監測",
+  sentinel2: "Sentinel-2監測",
   report: "通報報告",
   ai: "專家摘要"
 };
@@ -2172,6 +2173,194 @@ document.querySelector("#copyAddPointCmd")?.addEventListener("click", async () =
   setTimeout(() => (btn.textContent = original), 1500);
 });
 
+const s2State = {
+  data: null,
+  index: 4,
+  metric: "debris_bare_pct",
+  timer: null
+};
+
+const s2MetricDefs = {
+  debris_bare_pct: { label: "崩積區裸露", color: "#d97706", suffix: "%", derive: (o) => o.debris_bare_pct },
+  residual_bare_pct: { label: "殘壩區裸露", color: "#db2777", suffix: "%", derive: (o) => o.residual_bare_pct },
+  downstream_bare_pct: { label: "下游裸露", color: "#2563eb", suffix: "%", derive: (o) => o.downstream_bare_pct },
+  residual_vegetation_pct: { label: "殘壩植生覆蓋（衍生）", color: "#268454", suffix: "%", derive: (o) => 100 - o.residual_bare_pct }
+};
+
+function s2Delta(value, previous, suffix = "%") {
+  if (previous == null) return "首期基準";
+  const delta = value - previous;
+  const sign = delta > 0 ? "+" : "";
+  return `較前期 ${sign}${delta.toFixed(1)}${suffix === "%" ? " 個百分點" : ` ${suffix}`}`;
+}
+
+function s2MetricCard(label, value, suffix, note, tone) {
+  return `<article class="metric-card s2-metric-card ${tone}">
+    <span>${label}</span>
+    <strong>${value}${suffix}</strong>
+    <small>${note}</small>
+  </article>`;
+}
+
+function s2LineChart(observations, metricKey, selectedIndex) {
+  const def = s2MetricDefs[metricKey];
+  const width = 720;
+  const height = 270;
+  const margin = { left: 46, right: 20, top: 24, bottom: 54 };
+  const innerW = width - margin.left - margin.right;
+  const innerH = height - margin.top - margin.bottom;
+  const values = observations.map(def.derive);
+  const x = (i) => margin.left + (observations.length === 1 ? innerW / 2 : i * innerW / (observations.length - 1));
+  const y = (v) => margin.top + innerH - (v / 100) * innerH;
+  const grid = [0, 25, 50, 75, 100].map((tick) => `
+    <line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}"></line>
+    <text x="${margin.left - 9}" y="${y(tick) + 4}" text-anchor="end">${tick}</text>`).join("");
+  const points = values.map((value, i) => `${x(i)},${y(value)}`).join(" ");
+  const nodes = observations.map((obs, i) => `
+    <g class="s2-chart-point-group ${i === selectedIndex ? "selected" : ""}" data-s2-index="${i}" role="button" tabindex="0" aria-label="${obs.roc_date} ${def.label} ${values[i].toFixed(1)}%">
+      <circle cx="${x(i)}" cy="${y(values[i])}" r="${i === selectedIndex ? 7 : 5}"></circle>
+      <text class="s2-point-value" x="${x(i)}" y="${y(values[i]) - 12}" text-anchor="middle">${values[i].toFixed(1)}</text>
+      <text class="s2-x-label" x="${x(i)}" y="${height - 25}" text-anchor="middle">${obs.roc_date.slice(0, 6)}</text>
+    </g>`).join("");
+  return `<div class="s2-chart-title"><strong>${def.label}</strong><span>單位：%</span></div>
+    <svg viewBox="0 0 ${width} ${height}" class="s2-chart-svg" aria-label="${def.label}時序圖">
+      <g class="s2-chart-grid">${grid}</g>
+      <polyline points="${points}" fill="none" stroke="${def.color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      <g class="s2-chart-points" style="--series-color:${def.color}">${nodes}</g>
+    </svg>`;
+}
+
+function s2BarChart(observations, selectedIndex) {
+  const width = 720;
+  const height = 235;
+  const margin = { left: 46, right: 20, top: 28, bottom: 52 };
+  const innerW = width - margin.left - margin.right;
+  const innerH = height - margin.top - margin.bottom;
+  const max = 140;
+  const slot = innerW / observations.length;
+  const barW = Math.min(62, slot * 0.55);
+  const y = (v) => margin.top + innerH - (v / max) * innerH;
+  const grid = [0, 35, 70, 105, 140].map((tick) => `
+    <line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}"></line>
+    <text x="${margin.left - 9}" y="${y(tick) + 4}" text-anchor="end">${tick}</text>`).join("");
+  const bars = observations.map((obs, i) => {
+    const cx = margin.left + slot * i + slot / 2;
+    const top = y(obs.water_area_ha);
+    const selected = i === selectedIndex ? "selected" : "";
+    const prefix = obs.water_area_is_minimum ? "≥" : "";
+    return `<g class="s2-water-bar ${selected}" data-s2-index="${i}" role="button" tabindex="0" aria-label="${obs.roc_date} 水域 ${prefix}${obs.water_area_ha}公頃">
+      <rect x="${cx - barW / 2}" y="${top}" width="${barW}" height="${margin.top + innerH - top}" rx="7"></rect>
+      <text class="s2-point-value" x="${cx}" y="${top - 9}" text-anchor="middle">${prefix}${obs.water_area_ha}</text>
+      <text class="s2-x-label" x="${cx}" y="${height - 23}" text-anchor="middle">${obs.roc_date.slice(0, 6)}</text>
+    </g>`;
+  }).join("");
+  return `<div class="s2-chart-title"><strong>NDWI判釋水域面積</strong><span>單位：ha</span></div>
+    <svg viewBox="0 0 ${width} ${height}" class="s2-chart-svg" aria-label="NDWI水域面積時序圖">
+      <g class="s2-chart-grid">${grid}</g>
+      ${bars}
+    </svg>`;
+}
+
+function bindS2ChartSelection(root) {
+  root.querySelectorAll("[data-s2-index]").forEach((node) => {
+    const select = () => selectS2Observation(Number(node.dataset.s2Index));
+    node.addEventListener("click", select);
+    node.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        select();
+      }
+    });
+  });
+}
+
+function selectS2Observation(index) {
+  if (!s2State.data) return;
+  const observations = s2State.data.observations;
+  s2State.index = (index + observations.length) % observations.length;
+  renderSentinel2View();
+}
+
+function renderSentinel2View() {
+  const data = s2State.data;
+  if (!data) return;
+  const observations = data.observations;
+  const obs = observations[s2State.index];
+  const prev = observations[s2State.index - 1];
+
+  document.querySelector("#s2Timeline").innerHTML = observations.map((item, i) => `
+    <button type="button" class="s2-time-button ${i === s2State.index ? "active" : ""}" data-s2-index="${i}">
+      <strong>${item.roc_date}</strong><span>${item.phase}</span>
+    </button>`).join("");
+
+  document.querySelector("#s2MetricCards").innerHTML = [
+    s2MetricCard("崩積區裸露", obs.debris_bare_pct.toFixed(1), "%", s2Delta(obs.debris_bare_pct, prev?.debris_bare_pct), "orange"),
+    s2MetricCard("殘壩區裸露", obs.residual_bare_pct.toFixed(1), "%", s2Delta(obs.residual_bare_pct, prev?.residual_bare_pct), "pink"),
+    s2MetricCard("下游裸露", obs.downstream_bare_pct.toFixed(1), "%", s2Delta(obs.downstream_bare_pct, prev?.downstream_bare_pct), "blue"),
+    s2MetricCard("壩區水域", `${obs.water_area_is_minimum ? "≥" : ""}${obs.water_area_ha.toFixed(1)}`, " ha", s2Delta(obs.water_area_ha, prev?.water_area_ha, "ha"), "cyan")
+  ].join("");
+
+  document.querySelector("#s2SelectedDate").textContent = `${obs.roc_date}｜${obs.date}`;
+  document.querySelector("#s2SelectedPhase").textContent = obs.phase;
+  document.querySelector("#s2ObservationCount").textContent = `第 ${s2State.index + 1}／${observations.length} 期`;
+  document.querySelector("#s2Insight").innerHTML = `<strong>判讀：</strong>${obs.insight}`;
+
+  const columns = Object.values(data.image_columns);
+  document.querySelector("#s2ImagePanels").innerHTML = columns.map((col) => `
+    <figure class="s2-image-panel">
+      <figcaption>${col.label}</figcaption>
+      <svg viewBox="${col.x} ${obs.image_y} ${col.width} ${obs.image_height}" preserveAspectRatio="xMidYMid slice" aria-label="${obs.roc_date} ${col.label}">
+        <image href="${data.image}" x="0" y="0" width="1878" height="2503"></image>
+      </svg>
+    </figure>`).join("");
+
+  document.querySelector("#s2MetricTabs").innerHTML = Object.entries(s2MetricDefs).map(([key, def]) => `
+    <button type="button" data-s2-metric="${key}" class="${key === s2State.metric ? "active" : ""}">${def.label}</button>`).join("");
+
+  const trend = document.querySelector("#s2TrendChart");
+  const water = document.querySelector("#s2WaterChart");
+  trend.innerHTML = s2LineChart(observations, s2State.metric, s2State.index);
+  water.innerHTML = s2BarChart(observations, s2State.index);
+
+  document.querySelectorAll("[data-s2-metric]").forEach((button) => {
+    button.addEventListener("click", () => {
+      s2State.metric = button.dataset.s2Metric;
+      renderSentinel2View();
+    });
+  });
+  bindS2ChartSelection(document.querySelector("#sentinel2"));
+}
+
+async function initSentinel2() {
+  const page = document.querySelector("#sentinel2");
+  if (!page) return;
+  try {
+    const response = await fetch("./assets/sentinel2/sentinel2_timeseries.json", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    s2State.data = await response.json();
+    s2State.index = Math.max(0, s2State.data.observations.length - 1);
+    document.querySelector("#s2DerivedNote").textContent = s2State.data.derived_note;
+    document.querySelector("#s2Limitations").textContent = s2State.data.limitations;
+    document.querySelector("#s2Source").textContent = `資料來源：${s2State.data.source}｜資料更新：${s2State.data.updated_at}`;
+    renderSentinel2View();
+  } catch (error) {
+    document.querySelector("#s2ImagePanels").innerHTML = `<p class="muted-empty">Sentinel-2資料載入失敗：${error.message}</p>`;
+  }
+}
+
+document.querySelector("#s2Play")?.addEventListener("click", () => {
+  const button = document.querySelector("#s2Play");
+  if (s2State.timer) {
+    clearInterval(s2State.timer);
+    s2State.timer = null;
+    button.textContent = "▶ 播放時序";
+    return;
+  }
+  button.textContent = "Ⅱ 暫停";
+  selectS2Observation(s2State.index + 1);
+  s2State.timer = setInterval(() => selectS2Observation(s2State.index + 1), 1800);
+});
+
 renderPendingPoints();
 
 addParameterSketches();
@@ -2180,3 +2369,4 @@ if (modelDateInput && !modelDateInput.value) modelDateInput.value = new Date().t
 initSpatialMap();
 compute();
 renderMonitor();
+initSentinel2();

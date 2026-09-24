@@ -24,6 +24,7 @@
       <button class="nav-item" data-page="figures"><span>圖</span> 示意圖庫</button>
       <button class="nav-item" data-page="gis"><span>◎</span> 空間研判</button>
       <button class="nav-item" data-page="monitor"><span>雷</span> SAR監測</button>
+      <button class="nav-item" data-page="sentinel2"><span>葉</span> Sentinel-2</button>
       <button class="nav-item" data-page="report"><span>▨</span> 通報報告</button>
       <button class="nav-item" data-page="ai"><span>AI</span> 專家摘要</button>
       <div class="sidebar-footer">水土保持 · UAV · GIS · 風險治理</div>
@@ -496,6 +497,74 @@
             <p>門檻只由馬太鞍溪這一個事件率定，尚未在其他案例驗證通用性；只對「積水」訊號可靠；永久水體/地形陰影可能誤報。系統會自動取得、分析與發布，但黃色或紅色仍是人工查證觸發，不能直接視為已確認災害。</p>
           </div>
         </div>
+      </section>
+
+      <section class="page" id="sentinel2">
+        <div class="toolbar-card s2-heading">
+          <div>
+            <span class="section-kicker">Optical Monitoring</span>
+            <h2>Sentinel-2 NDVI／NDWI 多期監測</h2>
+            <p>用NDVI追蹤崩積區、殘壩區及下游河道的裸露變化與植生覆蓋訊號，並以NDWI判釋堰塞湖水域消長。點選日期或圖表點位，影像與指標會同步切換。</p>
+          </div>
+          <div class="s2-status-block">
+            <span class="s2-status-badge">目前 5 期</span>
+            <small>資料架構已支援後續每月追加</small>
+          </div>
+        </div>
+
+        <div class="s2-caveat" role="note">
+          <strong>資料完整性說明</strong>
+          <span>現有成果是5個跨季節觀測日，尚不是逐月完整序列；所有變化均屬衛星影像判釋，不能直接視為現地查證結果。</span>
+        </div>
+
+        <div class="s2-controls">
+          <div id="s2Timeline" class="s2-timeline" aria-label="Sentinel-2觀測日期"></div>
+          <button id="s2Play" type="button" class="outline s2-play">▶ 播放時序</button>
+        </div>
+
+        <div id="s2MetricCards" class="cards metric-cards s2-metric-cards"></div>
+
+        <div class="s2-visual-grid">
+          <article class="s2-imagery-card">
+            <div class="s2-card-head">
+              <div>
+                <span id="s2SelectedDate" class="section-kicker"></span>
+                <h3 id="s2SelectedPhase">載入中</h3>
+              </div>
+              <span id="s2ObservationCount" class="s2-observation-count"></span>
+            </div>
+            <div id="s2ImagePanels" class="s2-image-panels"></div>
+            <p id="s2Insight" class="s2-insight"></p>
+          </article>
+
+          <article class="s2-chart-card">
+            <div class="s2-card-head">
+              <div>
+                <span class="section-kicker">Interactive trend</span>
+                <h3>裸露／植生覆蓋時序</h3>
+              </div>
+            </div>
+            <div id="s2MetricTabs" class="s2-metric-tabs" aria-label="切換指標"></div>
+            <div id="s2TrendChart" class="s2-chart" aria-live="polite"></div>
+            <div id="s2WaterChart" class="s2-chart s2-water-chart" aria-live="polite"></div>
+          </article>
+        </div>
+
+        <div class="s2-method-grid">
+          <article class="module-card">
+            <div class="module-title"><span class="icon green">葉</span><h3>植生恢復如何判讀</h3></div>
+            <p id="s2DerivedNote"></p>
+          </article>
+          <article class="module-card">
+            <div class="module-title"><span class="icon blue">水</span><h3>NDWI湖面消長</h3></div>
+            <p>以有效像元判釋壩區水域面積；雲遮較多的期別以「至少」呈現，避免把被遮蔽水面誤當成不存在。</p>
+          </article>
+          <article class="module-card">
+            <div class="module-title"><span class="icon orange">限</span><h3>判釋限制</h3></div>
+            <p id="s2Limitations"></p>
+          </article>
+        </div>
+        <p id="s2Source" class="s2-source"></p>
       </section>
 
       <section class="page" id="report">

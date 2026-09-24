@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "title": "馬太鞍溪 Sentinel-2 NDVI／NDWI 多期監測",
+  "status": "five_observations_monthly_ready",
+  "updated_at": "2026-09-24",
+  "source": "工作執行計畫書表3-40、圖3-29；Copernicus Sentinel-2 L2A（10 m）",
+  "image": "./assets/sentinel2/sentinel2_ndvi_ndwi_5period.png",
+  "method_note": "NDVI影像中褐色代表裸露、綠色代表植生；NDWI用於判釋壩區水域。白色區為雲遮罩。",
+  "derived_note": "植生比例為100減去同區裸露率的衍生值，僅代表有效分類像元中的相對覆蓋，不等同現地植生存活率。",
+  "limitations": "五期影像跨季節且受雲與雲影影響；亮色裸岩、水體與陰影可能造成分類混淆。現階段屬遙測判釋，須以同季月序列、高解析影像、UAV與現地抽查交叉驗證。",
+  "image_columns": {
+    "true_color": { "label": "真色影像", "x": 284, "width": 524 },
+    "ndvi": { "label": "NDVI 裸露／植生", "x": 805, "width": 524 },
+    "ndwi": { "label": "NDWI 水域", "x": 1326, "width": 512 }
+  },
+  "observations": [
+    {
+      "date": "2024-07-18",
+      "roc_date": "113/07/18",
+      "phase": "災前",
+      "image_y": 114,
+      "image_height": 398,
+      "debris_bare_pct": 25.8,
+      "residual_bare_pct": 24.5,
+      "downstream_bare_pct": 5.6,
+      "water_area_ha": 2.5,
+      "insight": "災前基準；崩積區與殘壩區裸露比例約四分之一。"
+    },
+    {
+      "date": "2025-06-15",
+      "roc_date": "114/06/15",
+      "phase": "成湖前",
+      "image_y": 545,
+      "image_height": 399,
+      "debris_bare_pct": 33.5,
+      "residual_bare_pct": 26.0,
+      "downstream_bare_pct": 6.1,
+      "water_area_ha": 13.8,
+      "insight": "崩積區裸露由25.8%升至33.5%，水域面積增至13.8 ha。"
+    },
+    {
+      "date": "2025-08-17",
+      "roc_date": "114/08/17",
+      "phase": "堰塞湖存在期",
+      "image_y": 977,
+      "image_height": 399,
+      "debris_bare_pct": 98.3,
+      "residual_bare_pct": 97.5,
+      "downstream_bare_pct": 7.7,
+      "water_area_ha": 120.2,
+      "water_area_is_minimum": true,
+      "insight": "R1兩區裸露皆逾97%；受雲遮影響，湖面判釋至少120.2 ha。"
+    },
+    {
+      "date": "2025-10-11",
+      "roc_date": "114/10/11",
+      "phase": "潰壩後",
+      "image_y": 1409,
+      "image_height": 399,
+      "debris_bare_pct": 94.6,
+      "residual_bare_pct": 97.9,
+      "downstream_bare_pct": 11.1,
+      "water_area_ha": 14.6,
+      "insight": "潰壩後水域縮至14.6 ha；下游裸露比例增至11.1%。"
+    },
+    {
+      "date": "2026-04-14",
+      "roc_date": "115/04/14",
+      "phase": "現況",
+      "image_y": 1841,
+      "image_height": 398,
+      "debris_bare_pct": 93.2,
+      "residual_bare_pct": 94.0,
+      "downstream_bare_pct": 16.4,
+      "water_area_ha": 5.6,
+      "insight": "殘壩裸露由97.9%降至94.0%，呈現初步覆蓋增加訊號；下游裸露續增至16.4%。"
+    }
+  ]
+}

@@ -1953,3 +1953,243 @@ input, select, textarea {
   margin-top: 8px;
   align-self: flex-start;
 }
+
+/* Sentinel-2 NDVI / NDWI dynamic monitoring */
+.s2-heading {
+  align-items: center;
+  background: linear-gradient(135deg, #f5fbf5, #f7fbff 58%, #fffaf1);
+  border-left: 5px solid #268454;
+}
+.s2-heading h2 { margin: 3px 0 6px; }
+.s2-heading p { max-width: 880px; }
+.s2-status-block {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  flex: none;
+}
+.s2-status-block small { color: #637486; white-space: nowrap; }
+.s2-status-badge {
+  padding: 8px 13px;
+  border-radius: 999px;
+  background: #e6f4e7;
+  color: #22693f;
+  font-weight: 800;
+}
+.s2-caveat {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 12px 0;
+  padding: 12px 15px;
+  border: 1px solid #efd59d;
+  border-left: 5px solid #d68a1f;
+  border-radius: 10px;
+  background: #fff9ed;
+  color: #6f541d;
+  line-height: 1.55;
+}
+.s2-caveat strong { white-space: nowrap; color: #8b5b17; }
+.s2-controls {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin: 14px 0;
+}
+.s2-timeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 8px;
+  flex: 1;
+}
+.s2-time-button {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid #cdd9df;
+  border-radius: 9px;
+  background: #fff;
+  color: #365165;
+  cursor: pointer;
+  text-align: left;
+}
+.s2-time-button strong { font-size: 14px; }
+.s2-time-button span { color: #6f8190; font-size: 12px; }
+.s2-time-button:hover { border-color: #4b9670; background: #f3faf5; }
+.s2-time-button.active {
+  border-color: #226c45;
+  background: #226c45;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(34,108,69,.18);
+}
+.s2-time-button.active span { color: #dff1e4; }
+.s2-play { min-width: 116px; }
+.s2-metric-cards { margin-bottom: 16px; }
+.s2-metric-card { position: relative; overflow: hidden; }
+.s2-metric-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: #8c9aa5;
+}
+.s2-metric-card.orange::before { background: #d97706; }
+.s2-metric-card.pink::before { background: #db2777; }
+.s2-metric-card.blue::before { background: #2563eb; }
+.s2-metric-card.cyan::before { background: #159bc6; }
+.s2-metric-card small { color: #6f8190; }
+.s2-visual-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(420px, .85fr);
+  gap: 16px;
+}
+.s2-imagery-card,
+.s2-chart-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #d7e1e7;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(31,58,75,.06);
+}
+.s2-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.s2-card-head h3 { margin: 3px 0 0; color: #173e56; }
+.s2-observation-count {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #edf3f6;
+  color: #5d7180;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.s2-image-panels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.s2-image-panel {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #cfd9de;
+  border-radius: 9px;
+  background: #f4f7f7;
+}
+.s2-image-panel figcaption {
+  padding: 7px 8px;
+  background: #193f54;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+.s2-image-panel svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.32 / 1;
+  background: #eef3f4;
+}
+.s2-insight {
+  margin: 12px 0 0;
+  padding: 11px 13px;
+  border-radius: 9px;
+  background: #f3f8f1;
+  color: #3f5f3a;
+  line-height: 1.55;
+}
+.s2-metric-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 4px 0 10px;
+}
+.s2-metric-tabs button {
+  padding: 7px 10px;
+  border: 1px solid #cbd8df;
+  border-radius: 999px;
+  background: #fff;
+  color: #496273;
+  font-size: 12px;
+  cursor: pointer;
+}
+.s2-metric-tabs button:hover { border-color: #268454; color: #22693f; }
+.s2-metric-tabs button.active { border-color: #226c45; background: #e7f4ea; color: #205f3b; font-weight: 800; }
+.s2-chart {
+  margin-top: 8px;
+  padding: 9px 9px 2px;
+  border: 1px solid #e1e8ec;
+  border-radius: 10px;
+  background: #fbfdfe;
+}
+.s2-water-chart { margin-top: 11px; }
+.s2-chart-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 5px 0;
+  color: #25485d;
+}
+.s2-chart-title span { color: #718491; font-size: 11px; }
+.s2-chart-svg { display: block; width: 100%; height: auto; }
+.s2-chart-grid line { stroke: #dfe7eb; stroke-width: 1; }
+.s2-chart-grid text,
+.s2-x-label { fill: #6d7f8c; font-family: inherit; font-size: 11px; }
+.s2-point-value { fill: #314f61; font-family: inherit; font-size: 12px; font-weight: 800; }
+.s2-chart-point-group,
+.s2-water-bar { cursor: pointer; outline: none; }
+.s2-chart-point-group circle {
+  fill: var(--series-color);
+  stroke: #fff;
+  stroke-width: 3;
+  transition: r .15s ease, filter .15s ease;
+}
+.s2-chart-point-group:hover circle,
+.s2-chart-point-group:focus-visible circle,
+.s2-chart-point-group.selected circle {
+  filter: drop-shadow(0 0 5px rgba(23,62,86,.45));
+  stroke: #173e56;
+}
+.s2-water-bar rect { fill: #159bc6; opacity: .72; transition: opacity .15s ease; }
+.s2-water-bar:hover rect,
+.s2-water-bar:focus-visible rect,
+.s2-water-bar.selected rect { fill: #087ba5; opacity: 1; }
+.s2-water-bar.selected rect { stroke: #173e56; stroke-width: 3; }
+.s2-method-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.s2-method-grid p { line-height: 1.65; }
+.s2-source {
+  margin: 13px 3px 0;
+  color: #6c7d89;
+  font-size: 12px;
+}
+
+@media (max-width: 1180px) {
+  .s2-visual-grid { grid-template-columns: 1fr; }
+  .s2-timeline { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .s2-heading { align-items: flex-start; }
+  .s2-status-block { justify-items: start; }
+  .s2-caveat { display: grid; }
+  .s2-controls { flex-direction: column; }
+  .s2-timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .s2-image-panels { grid-template-columns: 1fr; }
+  .s2-image-panel svg { aspect-ratio: 1.6 / 1; }
+  .s2-method-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .s2-chart-point-group circle,
+  .s2-water-bar rect { transition: none; }
+}
