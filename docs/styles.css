@@ -1847,6 +1847,7 @@ input, select, textarea {
   .monitor-point.latest:not(.playback) { animation: none; }
 }
 .monitor-local-panel { margin: 14px 0; border: 1px dashed #c8b23a; background: #fffdf3; }
+.monitor-local-panel[hidden] { display: none !important; }
 .monitor-local-actions {
   display: flex;
   gap: 10px;
