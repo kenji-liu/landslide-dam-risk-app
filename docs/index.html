@@ -432,13 +432,14 @@
           </div>
           <span id="monitorUpdated" class="monitor-updated"></span>
         </div>
+        <div id="monitorFreshness" class="monitor-freshness" role="status" aria-live="polite"></div>
         <div id="monitorLocalPanel" class="toolbar-card monitor-local-panel" hidden>
           <div>
             <h3>本機分析（僅限本機開啟時可用）</h3>
-            <p>偵測到你是用 localhost 開啟這頁，可以直接觸發本機的 <code>sar_monitor.py</code> 重新分析，不用等每天08:00排程。「推送到GitHub」會讓公開網站同步更新，請先確認結果沒問題再按。</p>
+            <p>偵測到你是用 localhost 開啟這頁，可以立即搜尋最新Sentinel-1、接續HyP3工作並更新分析，不用等每天08:00排程。雲端處理若尚未完成，下次執行會自動接續，不會重複送件。</p>
           </div>
           <div class="monitor-local-actions">
-            <button id="monitorRunBtn" type="button">立即重新分析</button>
+            <button id="monitorRunBtn" type="button">檢查新影像並更新分析</button>
             <button id="monitorPushBtn" type="button" class="outline">推送到GitHub（公開網站更新）</button>
           </div>
           <pre id="monitorLocalLog" class="monitor-local-log"></pre>
@@ -492,7 +493,7 @@
         <div class="toolbar-card">
           <div>
             <h3>使用限制</h3>
-            <p>門檻只由馬太鞍溪這一個事件率定，尚未在其他案例驗證通用性；只對「積水」訊號可靠；永久水體/地形陰影可能誤報；觸發黃色或紅色後仍需人工調閱光學影像、安排UAV複查，本頁不做自動告警。</p>
+            <p>門檻只由馬太鞍溪這一個事件率定，尚未在其他案例驗證通用性；只對「積水」訊號可靠；永久水體/地形陰影可能誤報。系統會自動取得、分析與發布，但黃色或紅色仍是人工查證觸發，不能直接視為已確認災害。</p>
           </div>
         </div>
       </section>

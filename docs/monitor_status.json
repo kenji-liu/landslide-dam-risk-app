@@ -1,5 +1,26 @@
 {
-  "updated": "2026-09-24 08:32",
+  "updated": "2026-09-24 13:48",
+  "processed_at": "2026-09-24 13:48",
+  "freshness": {
+    "status": "stale",
+    "label": "資料延遲",
+    "latest_acquisition": "2026-08-23",
+    "latest_pair": "2026-08-11→2026-08-23",
+    "latency_days": 32,
+    "stale_after_days": 14,
+    "message": "最後觀測距今 32 天，已超過 14 天門檻；目前警戒值不能代表即時現況。"
+  },
+  "ingest": {
+    "checked_at": "2026-09-24T13:47:05+08:00",
+    "status": "processing",
+    "message": "HyP3正在處理 2026-09-04→2026-09-16，下次排程會繼續查詢。",
+    "latest_available_acquisition": "2026-09-16",
+    "latest_target_pair": [
+      "20260904",
+      "20260916"
+    ],
+    "job_status": "RUNNING"
+  },
   "thresholds": {
     "yellow_db": -10.0,
     "yellow_run": 2,
@@ -12,7 +33,7 @@
       "name": "壩區",
       "level": "綠色正常",
       "level_class": "ok",
-      "latest": "+2.5dB (2026-08-11)",
+      "latest": "+2.5dB (2026-08-11→2026-08-23)",
       "reason": "最新一期 2.5dB，未達關注門檻",
       "lon": 121.298194,
       "lat": 23.698951,
@@ -24,7 +45,7 @@
       "name": "SAR異常區",
       "level": "綠色正常",
       "level_class": "ok",
-      "latest": "-1.3dB (2026-08-11)",
+      "latest": "-1.3dB (2026-08-11→2026-08-23)",
       "reason": "最新一期 -1.3dB，未達關注門檻",
       "lon": 121.295004,
       "lat": 23.700038,
@@ -36,7 +57,7 @@
       "name": "堰塞湖區",
       "level": "綠色正常",
       "level_class": "ok",
-      "latest": "-4.5dB (2026-08-11)",
+      "latest": "-4.5dB (2026-08-11→2026-08-23)",
       "reason": "最新一期 -4.5dB，未達關注門檻",
       "lon": 121.290338,
       "lat": 23.697331,

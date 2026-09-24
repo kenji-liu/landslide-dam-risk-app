@@ -1693,6 +1693,7 @@ function renderMonitor() {
   const cardsEl = document.querySelector("#monitorCards");
   const chartsEl = document.querySelector("#monitorCharts");
   const updatedEl = document.querySelector("#monitorUpdated");
+  const freshnessEl = document.querySelector("#monitorFreshness");
   if (!cardsEl || !chartsEl) return;
   initMonitorLocalPanel();
   fetch("./monitor_status.json", { cache: "no-store" })
@@ -1703,8 +1704,26 @@ function renderMonitor() {
     .then((data) => {
       monitorPublishedPoints = data.points || [];
       monitorThresholds = data.thresholds || null;
-      if (updatedEl) updatedEl.textContent = `資料更新時間：${data.updated}（本機監測程式產生，非即時運算）`;
+      if (updatedEl) updatedEl.textContent = `程式處理時間：${data.processed_at || data.updated}`;
       updatedEl && updatedEl.classList.add("monitor-updated");
+      const freshness = data.freshness || {};
+      const ingest = data.ingest || {};
+      if (freshnessEl) {
+        const freshnessClass = ["current", "stale", "warning", "no_data"].includes(freshness.status)
+          ? freshness.status : "unknown";
+        const pairLine = freshness.latest_pair ? `最後配對：${freshness.latest_pair}` : "最後配對：無資料";
+        const acquisitionLine = freshness.latest_acquisition
+          ? `最後觀測：${freshness.latest_acquisition}（距今 ${freshness.latency_days} 天）`
+          : "最後觀測：無資料";
+        const ingestLine = ingest.message ? `<small>影像取得：${ingest.message}</small>` : "";
+        freshnessEl.className = `monitor-freshness ${freshnessClass}`;
+        freshnessEl.innerHTML = `
+          <div><span class="monitor-freshness-dot" aria-hidden="true"></span><strong>${freshness.label || "資料狀態未知"}</strong></div>
+          <p>${acquisitionLine}　｜　${pairLine}</p>
+          <p>${freshness.message || "尚未取得資料新鮮度資訊。"}</p>
+          ${ingestLine}
+        `;
+      }
       cardsEl.innerHTML = data.points.map((p) => `
         <div class="card">
           <strong>${p.name}</strong>
@@ -1777,7 +1796,7 @@ function initMonitorLocalPanel() {
   if (runBtn && !runBtn.dataset.bound) {
     runBtn.dataset.bound = "1";
     runBtn.addEventListener("click", () => {
-      callMonitorLocalApi("/run", "執行中，重新掃描新配對並更新趨勢圖，可能要一點時間...").then((data) => {
+      callMonitorLocalApi("/run", "正在搜尋新影像、接續HyP3工作並更新趨勢圖...").then((data) => {
         if (data && data.ok) renderMonitor();
       });
     });

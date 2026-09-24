@@ -1615,6 +1615,27 @@ input, select, textarea {
   color: #70869a;
   font-size: 12px;
 }
+.monitor-freshness {
+  margin: 12px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid #c7ccd3;
+  border-left-width: 5px;
+  border-radius: 10px;
+  background: #f7f8fa;
+  color: #26313c;
+}
+.monitor-freshness > div { display: flex; align-items: center; gap: 8px; }
+.monitor-freshness p { margin: 5px 0 0; line-height: 1.55; }
+.monitor-freshness small { display: block; margin-top: 6px; color: #56616d; line-height: 1.5; }
+.monitor-freshness-dot { width: 10px; height: 10px; border-radius: 50%; background: #7b8793; flex: none; }
+.monitor-freshness.current { border-left-color: #4a6741; background: #f3f8f1; }
+.monitor-freshness.current .monitor-freshness-dot { background: #4a6741; }
+.monitor-freshness.stale,
+.monitor-freshness.warning { border-left-color: #a85d1f; background: #fff7ec; }
+.monitor-freshness.stale .monitor-freshness-dot,
+.monitor-freshness.warning .monitor-freshness-dot { background: #a85d1f; }
+.monitor-freshness.no_data { border-left-color: #9c3b32; background: #fff3f2; }
+.monitor-freshness.no_data .monitor-freshness-dot { background: #9c3b32; }
 .monitor-reason {
   display: block;
   margin-top: 6px;
