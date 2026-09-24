@@ -1,25 +1,25 @@
 {
-  "updated": "2026-09-24 13:48",
-  "processed_at": "2026-09-24 13:48",
+  "updated": "2026-09-24 14:20",
+  "processed_at": "2026-09-24 14:20",
   "freshness": {
-    "status": "stale",
-    "label": "資料延遲",
-    "latest_acquisition": "2026-08-23",
-    "latest_pair": "2026-08-11→2026-08-23",
-    "latency_days": 32,
+    "status": "current",
+    "label": "資料在有效期內",
+    "latest_acquisition": "2026-09-16",
+    "latest_pair": "2026-09-04→2026-09-16",
+    "latency_days": 8,
     "stale_after_days": 14,
-    "message": "最後觀測距今 32 天，已超過 14 天門檻；目前警戒值不能代表即時現況。"
+    "message": "最後觀測距今 8 天，尚未超過 14 天門檻。"
   },
   "ingest": {
-    "checked_at": "2026-09-24T13:47:05+08:00",
-    "status": "processing",
-    "message": "HyP3正在處理 2026-09-04→2026-09-16，下次排程會繼續查詢。",
+    "checked_at": "2026-09-24T14:20:33+08:00",
+    "status": "ready",
+    "message": "HyP3工作已完成並下載：2026-09-04→2026-09-16。",
     "latest_available_acquisition": "2026-09-16",
     "latest_target_pair": [
       "20260904",
       "20260916"
     ],
-    "job_status": "RUNNING"
+    "job_status": "SUCCEEDED"
   },
   "thresholds": {
     "yellow_db": -10.0,
@@ -33,8 +33,8 @@
       "name": "壩區",
       "level": "綠色正常",
       "level_class": "ok",
-      "latest": "+2.5dB (2026-08-11→2026-08-23)",
-      "reason": "最新一期 2.5dB，未達關注門檻",
+      "latest": "-0.5dB (2026-09-04→2026-09-16)",
+      "reason": "最新一期 -0.5dB，未達關注門檻",
       "lon": 121.298194,
       "lat": 23.698951,
       "note": "堰塞湖壩區座標",
@@ -45,8 +45,8 @@
       "name": "SAR異常區",
       "level": "綠色正常",
       "level_class": "ok",
-      "latest": "-1.3dB (2026-08-11→2026-08-23)",
-      "reason": "最新一期 -1.3dB，未達關注門檻",
+      "latest": "+1.6dB (2026-09-04→2026-09-16)",
+      "reason": "最新一期 1.6dB，未達關注門檻",
       "lon": 121.295004,
       "lat": 23.700038,
       "note": "347m核心異常區，兩組獨立配對交叉驗證過",
@@ -57,8 +57,8 @@
       "name": "堰塞湖區",
       "level": "綠色正常",
       "level_class": "ok",
-      "latest": "-4.5dB (2026-08-11→2026-08-23)",
-      "reason": "最新一期 -4.5dB，未達關注門檻",
+      "latest": "-3.4dB (2026-09-04→2026-09-16)",
+      "reason": "最新一期 -3.4dB，未達關注門檻",
       "lon": 121.290338,
       "lat": 23.697331,
       "note": "官方測量堰塞湖範圍中心（多邊形測量地標.kmz）",
