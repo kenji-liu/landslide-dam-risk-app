@@ -2251,152 +2251,366 @@ document.querySelector("#copyAddPointCmd")?.addEventListener("click", async () =
 
 const s2State = {
   data: null,
-  index: 4,
+  index: 0,
   metric: "debris_bare_pct",
   timer: null
 };
 
 const s2MetricDefs = {
-  debris_bare_pct: { label: "崩積區裸露", color: "#d97706", suffix: "%", derive: (o) => o.debris_bare_pct },
-  residual_bare_pct: { label: "殘壩區裸露", color: "#db2777", suffix: "%", derive: (o) => o.residual_bare_pct },
-  downstream_bare_pct: { label: "下游裸露", color: "#2563eb", suffix: "%", derive: (o) => o.downstream_bare_pct },
-  residual_vegetation_pct: { label: "殘壩植生覆蓋（衍生）", color: "#268454", suffix: "%", derive: (o) => 100 - o.residual_bare_pct }
+  debris_bare_pct: { label: "崩積區裸露", color: "#d97706", cov: "debris", refKey: "debris_bare_pct", derive: (m) => m.debris_bare_pct },
+  residual_bare_pct: { label: "殘壩區裸露", color: "#db2777", cov: "residual", refKey: "residual_bare_pct", derive: (m) => m.residual_bare_pct },
+  downstream_bare_pct: { label: "下游裸露", color: "#2563eb", cov: "downstream", refKey: "downstream_bare_pct", derive: (m) => m.downstream_bare_pct },
+  residual_vegetation_pct: { label: "殘壩植生覆蓋（衍生）", color: "#268454", cov: "residual", refKey: "residual_bare_pct", refDerive: (v) => 100 - v, derive: (m) => (m.residual_bare_pct == null ? null : 100 - m.residual_bare_pct) }
 };
 
-function s2Delta(value, previous, suffix = "%") {
-  if (previous == null) return "首期基準";
-  const delta = value - previous;
-  const sign = delta > 0 ? "+" : "";
-  return `較前期 ${sign}${delta.toFixed(1)}${suffix === "%" ? " 個百分點" : ` ${suffix}`}`;
+const s2NewWaterClass = {
+  new_candidate: { label: "新生水域候選", tone: "nw-new", color: "#dc2626" },
+  known_lake: { label: "既有堰塞湖區", tone: "nw-lake", color: "#1d6fd8" },
+  landslide_surface: { label: "崩積／殘壩區表面", tone: "nw-slide", color: "#a16207" },
+  downstream_channel: { label: "河道水域變遷", tone: "nw-down", color: "#64748b" },
+  transient: { label: "單月孤立訊號", tone: "nw-down", color: "#94a3b8" }
+};
+
+const S2_USABLE_COVERAGE = 0.4;
+
+function s2Months() {
+  return s2State.data?.months || [];
 }
 
-function s2MetricCard(label, value, suffix, note, tone) {
-  return `<article class="metric-card s2-metric-card ${tone}">
+function s2HasImagery(m) {
+  return !!m?.images;
+}
+
+function s2IsCloudy(m) {
+  return !m || !s2HasImagery(m) || m.status === "low_coverage";
+}
+
+function s2Fmt(v, digits = 1) {
+  return v == null || Number.isNaN(v) ? "—" : Number(v).toFixed(digits);
+}
+
+function s2Pct(v) {
+  return v == null ? "—" : `${Math.round(v * 100)}%`;
+}
+
+function s2PrevUsable(index, key, covKey) {
+  const months = s2Months();
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const m = months[i];
+    if (m[key] != null && (m.coverage?.[covKey] ?? 0) >= S2_USABLE_COVERAGE) return m;
+  }
+  return null;
+}
+
+function s2Delta(value, previous, unit) {
+  if (value == null) return "本月無有效觀測";
+  if (!previous) return "無前一可用月";
+  const delta = value - previous.value;
+  const sign = delta > 0 ? "+" : "";
+  return `較 ${previous.label} ${sign}${delta.toFixed(1)}${unit === "%" ? " 個百分點" : ` ${unit}`}`;
+}
+
+function s2MetricCard(label, value, suffix, note, coverage, tone) {
+  const low = coverage != null && coverage < S2_USABLE_COVERAGE;
+  return `<article class="metric-card s2-metric-card ${tone}${low ? " low" : ""}">
     <span>${label}</span>
-    <strong>${value}${suffix}</strong>
+    <strong>${value}${value === "—" ? "" : suffix}</strong>
     <small>${note}</small>
+    <small class="s2-cov">有效覆蓋 ${s2Pct(coverage)}${low ? "（僅供參考）" : ""}</small>
   </article>`;
 }
 
-function s2LineChart(observations, metricKey, selectedIndex) {
+function s2RefIndex(ref) {
+  const ym = ref.date.slice(0, 7);
+  return s2Months().findIndex((m) => m.month === ym);
+}
+
+function s2Axis(months, x, height, margin) {
+  let ticks = "";
+  months.forEach((m, i) => {
+    if (m.month.endsWith("-01")) {
+      const year = Number(m.month.slice(0, 4)) - 1911;
+      ticks += `<line class="s2-year-tick" x1="${x(i)}" y1="${margin.top}" x2="${x(i)}" y2="${height - margin.bottom}"></line>
+        <text class="s2-x-label" x="${x(i)}" y="${height - margin.bottom + 16}" text-anchor="middle">${year}</text>`;
+    }
+  });
+  const events = (s2State.data.events || []).map((ev) => {
+    const i = months.findIndex((m) => m.month === ev.month);
+    if (i < 0) return "";
+    return `<line class="s2-event-line" x1="${x(i)}" y1="${margin.top - 4}" x2="${x(i)}" y2="${height - margin.bottom}"></line>
+      <text class="s2-event-label" x="${x(i) + 3}" y="${margin.top + 6}">${ev.label}</text>`;
+  }).join("");
+  return ticks + events;
+}
+
+function s2HitAreas(months, x, slot, top, h) {
+  return months.map((m, i) => `<rect class="s2-hit" data-s2-index="${i}" x="${x(i) - slot / 2}" y="${top}" width="${slot}" height="${h}"><title>${m.roc_month}</title></rect>`).join("");
+}
+
+function s2LineChart(metricKey, selectedIndex) {
   const def = s2MetricDefs[metricKey];
-  const width = 720;
+  const months = s2Months();
+  const width = 760;
   const height = 270;
-  const margin = { left: 46, right: 20, top: 24, bottom: 54 };
+  const margin = { left: 40, right: 14, top: 20, bottom: 38 };
   const innerW = width - margin.left - margin.right;
   const innerH = height - margin.top - margin.bottom;
-  const values = observations.map(def.derive);
-  const x = (i) => margin.left + (observations.length === 1 ? innerW / 2 : i * innerW / (observations.length - 1));
+  const n = months.length;
+  const slot = innerW / Math.max(1, n);
+  const x = (i) => margin.left + slot * (i + 0.5);
   const y = (v) => margin.top + innerH - (v / 100) * innerH;
   const grid = [0, 25, 50, 75, 100].map((tick) => `
     <line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}"></line>
-    <text x="${margin.left - 9}" y="${y(tick) + 4}" text-anchor="end">${tick}</text>`).join("");
-  const points = values.map((value, i) => `${x(i)},${y(value)}`).join(" ");
-  const nodes = observations.map((obs, i) => `
-    <g class="s2-chart-point-group ${i === selectedIndex ? "selected" : ""}" data-s2-index="${i}" role="button" tabindex="0" aria-label="${obs.roc_date} ${def.label} ${values[i].toFixed(1)}%">
-      <circle cx="${x(i)}" cy="${y(values[i])}" r="${i === selectedIndex ? 7 : 5}"></circle>
-      <text class="s2-point-value" x="${x(i)}" y="${y(values[i]) - 12}" text-anchor="middle">${values[i].toFixed(1)}</text>
-      <text class="s2-x-label" x="${x(i)}" y="${height - 25}" text-anchor="middle">${obs.roc_date.slice(0, 6)}</text>
-    </g>`).join("");
-  return `<div class="s2-chart-title"><strong>${def.label}</strong><span>單位：%</span></div>
-    <svg viewBox="0 0 ${width} ${height}" class="s2-chart-svg" aria-label="${def.label}時序圖">
+    <text x="${margin.left - 7}" y="${y(tick) + 4}" text-anchor="end">${tick}</text>`).join("");
+  const pts = months.map((m, i) => ({ i, v: def.derive(m), cov: m.coverage?.[def.cov] ?? 0 }));
+  const usable = pts.filter((p) => p.v != null && p.cov >= S2_USABLE_COVERAGE);
+  const line = usable.map((p) => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+  const dots = pts.filter((p) => p.v != null).map((p) => {
+    const ok = p.cov >= S2_USABLE_COVERAGE;
+    return `<circle class="s2-dot${ok ? "" : " hollow"}" cx="${x(p.i)}" cy="${y(p.v)}" r="${ok ? 2.6 : 2.4}"></circle>`;
+  }).join("");
+  const refs = (s2State.data.slide_reference?.observations || []).map((ref) => {
+    const i = s2RefIndex(ref);
+    if (i < 0 || ref[def.refKey] == null) return "";
+    const v = def.refDerive ? def.refDerive(ref[def.refKey]) : ref[def.refKey];
+    const cx = x(i); const cy = y(v);
+    return `<path class="s2-ref" d="M${cx} ${cy - 5} L${cx + 5} ${cy} L${cx} ${cy + 5} L${cx - 5} ${cy} Z"><title>簡報 ${ref.roc_date}：${v.toFixed(1)}%</title></path>`;
+  }).join("");
+  const sel = pts[selectedIndex];
+  const selMark = `<line class="s2-selected-line" x1="${x(selectedIndex)}" y1="${margin.top}" x2="${x(selectedIndex)}" y2="${height - margin.bottom}"></line>` +
+    (sel?.v != null ? `<circle class="s2-dot selected" cx="${x(selectedIndex)}" cy="${y(sel.v)}" r="6"></circle>
+      <text class="s2-point-value" x="${Math.min(x(selectedIndex), width - 40)}" y="${y(sel.v) - 11}" text-anchor="middle">${sel.v.toFixed(1)}</text>` : "");
+  return `<div class="s2-chart-title"><strong>${def.label}</strong><span>單位：%｜橫軸：民國年</span></div>
+    <svg viewBox="0 0 ${width} ${height}" class="s2-chart-svg" aria-label="${def.label}逐月時序圖">
       <g class="s2-chart-grid">${grid}</g>
-      <polyline points="${points}" fill="none" stroke="${def.color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
-      <g class="s2-chart-points" style="--series-color:${def.color}">${nodes}</g>
+      <g>${s2Axis(months, x, height, margin)}</g>
+      <polyline points="${line}" fill="none" stroke="${def.color}" stroke-width="2" stroke-linejoin="round" opacity=".85"></polyline>
+      <g style="--series-color:${def.color}">${dots}${selMark}</g>
+      <g>${refs}</g>
+      <g>${s2HitAreas(months, x, slot, margin.top, innerH)}</g>
     </svg>`;
 }
 
-function s2BarChart(observations, selectedIndex) {
-  const width = 720;
-  const height = 235;
-  const margin = { left: 46, right: 20, top: 28, bottom: 52 };
+function s2WaterChart(selectedIndex) {
+  const months = s2Months();
+  const width = 760;
+  const height = 215;
+  const margin = { left: 40, right: 14, top: 22, bottom: 38 };
   const innerW = width - margin.left - margin.right;
   const innerH = height - margin.top - margin.bottom;
-  const max = 140;
-  const slot = innerW / observations.length;
-  const barW = Math.min(62, slot * 0.55);
+  const n = months.length;
+  const slot = innerW / Math.max(1, n);
+  const x = (i) => margin.left + slot * (i + 0.5);
+  const refs = s2State.data.slide_reference?.observations || [];
+  const maxVal = Math.max(20, ...months.map((m) => m.water_area_ha || 0), ...refs.map((r) => r.water_area_ha || 0));
+  const max = Math.ceil(maxVal / 20) * 20;
   const y = (v) => margin.top + innerH - (v / max) * innerH;
-  const grid = [0, 35, 70, 105, 140].map((tick) => `
+  const ticks = [0, max / 4, max / 2, (3 * max) / 4, max];
+  const grid = ticks.map((tick) => `
     <line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}"></line>
-    <text x="${margin.left - 9}" y="${y(tick) + 4}" text-anchor="end">${tick}</text>`).join("");
-  const bars = observations.map((obs, i) => {
-    const cx = margin.left + slot * i + slot / 2;
-    const top = y(obs.water_area_ha);
-    const selected = i === selectedIndex ? "selected" : "";
-    const prefix = obs.water_area_is_minimum ? "≥" : "";
-    return `<g class="s2-water-bar ${selected}" data-s2-index="${i}" role="button" tabindex="0" aria-label="${obs.roc_date} 水域 ${prefix}${obs.water_area_ha}公頃">
-      <rect x="${cx - barW / 2}" y="${top}" width="${barW}" height="${margin.top + innerH - top}" rx="7"></rect>
-      <text class="s2-point-value" x="${cx}" y="${top - 9}" text-anchor="middle">${prefix}${obs.water_area_ha}</text>
-      <text class="s2-x-label" x="${cx}" y="${height - 23}" text-anchor="middle">${obs.roc_date.slice(0, 6)}</text>
-    </g>`;
+    <text x="${margin.left - 7}" y="${y(tick) + 4}" text-anchor="end">${Math.round(tick)}</text>`).join("");
+  const barW = Math.max(1.5, slot * 0.72);
+  const bars = months.map((m, i) => {
+    if (m.water_area_ha == null) return "";
+    const top = y(m.water_area_ha);
+    const low = (m.coverage?.dam_water_zone ?? 0) < S2_USABLE_COVERAGE;
+    const cls = `s2-wbar${m.water_area_is_minimum ? " minimum" : ""}${low ? " low" : ""}${i === selectedIndex ? " selected" : ""}`;
+    return `<rect class="${cls}" x="${x(i) - barW / 2}" y="${top}" width="${barW}" height="${Math.max(0.8, margin.top + innerH - top)}"></rect>`;
   }).join("");
-  return `<div class="s2-chart-title"><strong>NDWI判釋水域面積</strong><span>單位：ha</span></div>
-    <svg viewBox="0 0 ${width} ${height}" class="s2-chart-svg" aria-label="NDWI水域面積時序圖">
+  const refMarks = refs.map((ref) => {
+    const i = s2RefIndex(ref);
+    if (i < 0) return "";
+    const cx = x(i); const cy = y(ref.water_area_ha);
+    return `<path class="s2-ref" d="M${cx} ${cy - 5} L${cx + 5} ${cy} L${cx} ${cy + 5} L${cx - 5} ${cy} Z"><title>簡報 ${ref.roc_date}：${ref.water_area_is_minimum ? "≥" : ""}${ref.water_area_ha} ha</title></path>`;
+  }).join("");
+  const sel = months[selectedIndex];
+  const selLabel = sel?.water_area_ha != null
+    ? `<text class="s2-point-value" x="${Math.min(x(selectedIndex), width - 40)}" y="${y(sel.water_area_ha) - 8}" text-anchor="middle">${sel.water_area_is_minimum ? "≥" : ""}${sel.water_area_ha.toFixed(1)}</text>` : "";
+  return `<div class="s2-chart-title"><strong>壩區水域面積（MNDWI＋NDWI）</strong><span>單位：ha｜淺色＝雲遮下限值</span></div>
+    <svg viewBox="0 0 ${width} ${height}" class="s2-chart-svg" aria-label="壩區水域面積逐月時序圖">
       <g class="s2-chart-grid">${grid}</g>
-      ${bars}
+      <g>${s2Axis(months, x, height, margin)}</g>
+      <line class="s2-selected-line" x1="${x(selectedIndex)}" y1="${margin.top}" x2="${x(selectedIndex)}" y2="${height - margin.bottom}"></line>
+      <g>${bars}</g>${selLabel}
+      <g>${refMarks}</g>
+      <g>${s2HitAreas(months, x, slot, margin.top, innerH)}</g>
     </svg>`;
 }
 
-function bindS2ChartSelection(root) {
-  root.querySelectorAll("[data-s2-index]").forEach((node) => {
-    const select = () => selectS2Observation(Number(node.dataset.s2Index));
-    node.addEventListener("click", select);
-    node.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        select();
-      }
-    });
-  });
+function s2Rings(overlay, w, h) {
+  return overlay.rings.map((ring) => ring.map(([px, py]) => `${(px * w).toFixed(1)},${(py * h).toFixed(1)}`).join(" "));
+}
+
+function s2ImagePanel(label, href, m) {
+  const view = s2State.data.view;
+  const w = 1000;
+  const h = +(w / view.aspect).toFixed(1);
+  const ov = view.overlays;
+  const poly = (key, cls) => s2Rings(ov[key], w, h).map((pts) => `<polygon class="${cls}" points="${pts}"></polygon>`).join("");
+  const body = href
+    ? `<image href="${href}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"></image>
+       ${poly("lake_max", "s2-ov-lake")}${poly("debris", "s2-ov-debris")}${poly("residual", "s2-ov-residual")}`
+    : `<rect width="${w}" height="${h}" fill="#eef2f4"></rect><text x="${w / 2}" y="${h / 2}" text-anchor="middle" class="s2-empty-text">本月無可用影像（整月雲遮）</text>`;
+  return `<figure class="s2-image-panel">
+      <figcaption>${label}</figcaption>
+      <svg viewBox="0 0 ${w} ${h}" aria-label="${m.roc_month} ${label}">${body}</svg>
+    </figure>`;
+}
+
+function s2RenderOverview(m) {
+  const ovData = s2State.data.overview;
+  const w = 1000;
+  const h = +(w / ovData.aspect).toFixed(1);
+  const rings = (key, cls) => s2Rings(ovData.overlays[key], w, h).map((pts) => `<polygon class="${cls}" points="${pts}"></polygon>`).join("");
+  const found = m.new_water || [];
+  const marks = found.map((f, i) => {
+    const c = s2NewWaterClass[f.class] || s2NewWaterClass.new_candidate;
+    const r = Math.max(9, Math.min(30, Math.sqrt(f.area_ha) * 5));
+    return `<g class="s2-nw-mark"><circle cx="${f.ox * w}" cy="${f.oy * h}" r="${r}" stroke="${c.color}"></circle>
+      <text x="${f.ox * w + r + 3}" y="${f.oy * h + 4}" fill="${c.color}">${i + 1}</text><title>${c.label} ${f.area_ha} ha</title></g>`;
+  }).join("");
+  const img = m.images ? `<image href="${m.images.overview}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"></image>`
+    : `<rect width="${w}" height="${h}" fill="#eef2f4"></rect><text x="${w / 2}" y="${h / 2}" text-anchor="middle" class="s2-empty-text">本月無可用影像</text>`;
+  document.querySelector("#s2Overview").innerHTML = `<svg viewBox="0 0 ${w} ${h}" aria-label="${m.roc_month} 全流域水域偵測">
+      ${img}${rings("watershed", "s2-ov-ws")}${rings("downstream", "s2-ov-down")}${rings("view", "s2-ov-view")}${rings("lake_max", "s2-ov-lake")}${marks}
+    </svg>`;
+  const nNew = found.filter((f) => f.class === "new_candidate").length;
+  const badge = document.querySelector("#s2NewWaterBadge");
+  badge.textContent = !m.images ? "本月無觀測" : !m.water_scanned ? "雲遮過多，本月未掃描" : nNew ? `新生水域候選 ${nNew} 處` : "未偵測到新生水域候選";
+  badge.classList.toggle("alert", nNew > 0);
+  const routine = found.filter((f) => f.class === "downstream_channel" || f.class === "transient");
+  const notable = found.map((f, i) => ({ ...f, n: i + 1 })).filter((f) => !routine.includes(found[f.n - 1]));
+  const routineNote = routine.length
+    ? `<p class="s2-small">另有 ${routine.length} 處河道水域變遷／單月孤立訊號（地圖灰圈，共 ${routine.reduce((a, f) => a + f.area_ha, 0).toFixed(1)} ha），屬河道擺盪或雲影，不列入警示。</p>` : "";
+  document.querySelector("#s2NewWaterList").innerHTML = !m.images
+    ? `<p class="muted-empty">${m.status === "no_scene" ? "本月無Sentinel-2影像" : "本月整月雲遮"}，無法掃描。</p>`
+    : !m.water_scanned
+      ? `<p class="muted-empty">本月流域有效覆蓋不足50%，為避免殘雲誤報不做掃描。</p>`
+      : (notable.length
+        ? `<table class="s2-nw-table"><thead><tr><th>#</th><th>類型</th><th>面積</th><th>座標</th></tr></thead><tbody>${notable.map((f) => {
+            const c = s2NewWaterClass[f.class] || s2NewWaterClass.new_candidate;
+            return `<tr><td>${f.n}</td><td><span class="s2-nw-chip ${c.tone}">${c.label}${f.pending_confirm ? "（待下月確認）" : ""}</span></td><td>${f.area_ha} ha</td><td>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}</td></tr>`;
+          }).join("")}</tbody></table>`
+        : `<p class="muted-empty">本月無需關注的新增水體。</p>`) + routineNote;
+}
+
+function s2Insight(m, index) {
+  if (!m.images) return `<strong>判讀：</strong>${m.roc_month} 查無有效Sentinel-2觀測（${m.status === "no_scene" ? "無影像" : "整月雲遮"}），指標沿用前後月份判讀。`;
+  const parts = [];
+  const add = (key, covKey, label) => {
+    const prev = s2PrevUsable(index, key, covKey);
+    if (m[key] == null) return;
+    const d = prev ? m[key] - prev[key] : null;
+    parts.push(`${label}${m[key].toFixed(1)}%${d == null ? "" : `（較${prev.roc_month} ${d > 0 ? "+" : ""}${d.toFixed(1)}）`}`);
+  };
+  add("debris_bare_pct", "debris", "崩積區裸露");
+  add("residual_bare_pct", "residual", "殘壩區裸露");
+  add("downstream_bare_pct", "downstream", "下游裸露");
+  let text = parts.join("；");
+  if (m.water_area_ha != null) text += `；壩區水域${m.water_area_is_minimum ? "至少" : ""}${m.water_area_ha.toFixed(1)} ha`;
+  const nNew = (m.new_water || []).filter((f) => f.class === "new_candidate").length;
+  if (nNew) text += `。<b class="s2-warn">全流域偵測到 ${nNew} 處新生水域候選，請對照總覽圖人工確認是否為新堰塞湖。</b>`;
+  if (m.status === "low_coverage") text += "。本月有效覆蓋偏低，數值僅供參考。";
+  else if (!m.final) text += "。本月尚未結束，數值為暫定值。";
+  return `<strong>判讀：</strong>${text}`;
+}
+
+function s2Trend12(key, covKey, index) {
+  const months = s2Months();
+  const pts = [];
+  for (let i = Math.max(0, index - 11); i <= index; i += 1) {
+    const m = months[i];
+    if (m[key] != null && (m.coverage?.[covKey] ?? 0) >= S2_USABLE_COVERAGE) pts.push([i, m[key]]);
+  }
+  if (pts.length < 4) return null;
+  const mx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
+  const my = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  const sxy = pts.reduce((a, p) => a + (p[0] - mx) * (p[1] - my), 0);
+  const sxx = pts.reduce((a, p) => a + (p[0] - mx) ** 2, 0);
+  return { slopePerYear: (sxy / sxx) * 12, n: pts.length };
 }
 
 function selectS2Observation(index) {
-  if (!s2State.data) return;
-  const observations = s2State.data.observations;
-  s2State.index = (index + observations.length) % observations.length;
+  const months = s2Months();
+  if (!months.length) return;
+  s2State.index = Math.max(0, Math.min(months.length - 1, index));
   renderSentinel2View();
+}
+
+function s2Step(dir) {
+  const months = s2Months();
+  const skip = document.querySelector("#s2SkipCloudy")?.checked;
+  let i = s2State.index;
+  for (let k = 0; k < months.length; k += 1) {
+    i = (i + dir + months.length) % months.length;
+    if (!skip || !s2IsCloudy(months[i])) break;
+  }
+  selectS2Observation(i);
 }
 
 function renderSentinel2View() {
   const data = s2State.data;
   if (!data) return;
-  const observations = data.observations;
-  const obs = observations[s2State.index];
-  const prev = observations[s2State.index - 1];
+  const months = data.months;
+  const index = s2State.index;
+  const m = months[index];
 
-  document.querySelector("#s2Timeline").innerHTML = observations.map((item, i) => `
-    <button type="button" class="s2-time-button ${i === s2State.index ? "active" : ""}" data-s2-index="${i}">
-      <strong>${item.roc_date}</strong><span>${item.phase}</span>
-    </button>`).join("");
+  document.querySelector("#s2MonthSlider").value = String(index);
+  document.querySelector("#s2MonthLabel").textContent = m.roc_month;
+  document.querySelector("#s2MonthSub").textContent = `${m.month}${m.final ? "" : "（暫定）"}`;
 
+  const refByMonth = Object.fromEntries((data.slide_reference?.observations || []).map((r) => [r.date.slice(0, 7), r]));
+  const quick = (data.slide_reference?.observations || []).map((r) => ({ month: r.date.slice(0, 7), title: r.roc_date.slice(0, 6), sub: r.phase }));
+  if (data.latest_usable_month) quick.push({ month: data.latest_usable_month, title: months.find((x) => x.month === data.latest_usable_month)?.roc_month || "", sub: "最新可用月" });
+  document.querySelector("#s2Timeline").innerHTML = quick.map((q) => {
+    const i = months.findIndex((x) => x.month === q.month);
+    if (i < 0) return "";
+    return `<button type="button" class="s2-time-button ${i === index ? "active" : ""}" data-s2-index="${i}"><strong>${q.title}</strong><span>${q.sub}</span></button>`;
+  }).join("");
+
+  const cov = m.coverage || {};
+  const card = (key, covKey, label, tone) => {
+    const prev = s2PrevUsable(index, key, covKey);
+    const note = s2Delta(m[key], prev ? { value: prev[key], label: prev.roc_month } : null, "%");
+    return s2MetricCard(label, s2Fmt(m[key]), "%", note, cov[covKey], tone);
+  };
+  const prevW = s2PrevUsable(index, "water_area_ha", "dam_water_zone");
+  const nNew = (m.new_water || []).filter((f) => f.class === "new_candidate").length;
   document.querySelector("#s2MetricCards").innerHTML = [
-    s2MetricCard("崩積區裸露", obs.debris_bare_pct.toFixed(1), "%", s2Delta(obs.debris_bare_pct, prev?.debris_bare_pct), "orange"),
-    s2MetricCard("殘壩區裸露", obs.residual_bare_pct.toFixed(1), "%", s2Delta(obs.residual_bare_pct, prev?.residual_bare_pct), "pink"),
-    s2MetricCard("下游裸露", obs.downstream_bare_pct.toFixed(1), "%", s2Delta(obs.downstream_bare_pct, prev?.downstream_bare_pct), "blue"),
-    s2MetricCard("壩區水域", `${obs.water_area_is_minimum ? "≥" : ""}${obs.water_area_ha.toFixed(1)}`, " ha", s2Delta(obs.water_area_ha, prev?.water_area_ha, "ha"), "cyan")
+    card("debris_bare_pct", "debris", "崩積區裸露", "orange"),
+    card("residual_bare_pct", "residual", "殘壩區裸露", "pink"),
+    card("downstream_bare_pct", "downstream", "下游裸露", "blue"),
+    s2MetricCard("壩區水域", m.water_area_ha == null ? "—" : `${m.water_area_is_minimum ? "≥" : ""}${m.water_area_ha.toFixed(1)}`, " ha",
+      s2Delta(m.water_area_ha, prevW ? { value: prevW.water_area_ha, label: prevW.roc_month } : null, "ha"), cov.dam_water_zone, "cyan"),
+    `<article class="metric-card s2-metric-card ${nNew ? "red" : "green"}"><span>新生水域候選</span><strong>${m.images && m.water_scanned ? `${nNew} 處` : "—"}</strong>
+      <small>${!m.images ? "本月無觀測" : !m.water_scanned ? "雲遮過多未掃描" : nNew ? "需人工確認" : "全流域未見新增水體"}</small><small class="s2-cov">流域覆蓋 ${s2Pct(cov.watershed)}</small></article>`
   ].join("");
 
-  document.querySelector("#s2SelectedDate").textContent = `${obs.roc_date}｜${obs.date}`;
-  document.querySelector("#s2SelectedPhase").textContent = obs.phase;
-  document.querySelector("#s2ObservationCount").textContent = `第 ${s2State.index + 1}／${observations.length} 期`;
-  document.querySelector("#s2Insight").innerHTML = `<strong>判讀：</strong>${obs.insight}`;
+  const statusText = { ok: "有效觀測", partial: "部分雲遮", low_coverage: "雲遮嚴重", no_scene: "無影像", all_cloud: "整月雲遮" }[m.status] || m.status;
+  document.querySelector("#s2SelectedDate").textContent = `${m.roc_month}｜${m.month} 月合成`;
+  document.querySelector("#s2SelectedPhase").textContent = refByMonth[m.month] ? `${refByMonth[m.month].phase}（${statusText}）` : statusText;
+  const dates = (m.scenes || []).map((s) => s.date.slice(5)).join("、");
+  document.querySelector("#s2ObservationCount").textContent = m.n_scenes ? `${m.n_scenes} 景：${dates}` : "0 景";
+  document.querySelector("#s2Insight").innerHTML = s2Insight(m, index);
 
-  const columns = Object.values(data.image_columns);
-  document.querySelector("#s2ImagePanels").innerHTML = columns.map((col) => `
-    <figure class="s2-image-panel">
-      <figcaption>${col.label}</figcaption>
-      <svg viewBox="${col.x} ${obs.image_y} ${col.width} ${obs.image_height}" preserveAspectRatio="xMidYMid slice" aria-label="${obs.roc_date} ${col.label}">
-        <image href="${data.image}" x="0" y="0" width="1878" height="2503"></image>
-      </svg>
-    </figure>`).join("");
+  const img = m.images || {};
+  document.querySelector("#s2ImagePanels").innerHTML = [
+    s2ImagePanel("真色影像", img.tc, m),
+    s2ImagePanel("NDVI 裸露／植生", img.ndvi, m),
+    s2ImagePanel("NDWI 水域", img.ndwi, m)
+  ].join("");
 
   document.querySelector("#s2MetricTabs").innerHTML = Object.entries(s2MetricDefs).map(([key, def]) => `
     <button type="button" data-s2-metric="${key}" class="${key === s2State.metric ? "active" : ""}">${def.label}</button>`).join("");
-
-  const trend = document.querySelector("#s2TrendChart");
-  const water = document.querySelector("#s2WaterChart");
-  trend.innerHTML = s2LineChart(observations, s2State.metric, s2State.index);
-  water.innerHTML = s2BarChart(observations, s2State.index);
+  const def = s2MetricDefs[s2State.metric];
+  const trendKey = s2State.metric === "residual_vegetation_pct" ? "residual_bare_pct" : s2State.metric;
+  const trend = s2Trend12(trendKey, def.cov, index);
+  document.querySelector("#s2TrendNote").textContent = trend
+    ? `近12月${s2State.metric === "residual_vegetation_pct" ? "植生" : "裸露"}趨勢 ${(s2State.metric === "residual_vegetation_pct" ? -trend.slopePerYear : trend.slopePerYear) > 0 ? "+" : ""}${(s2State.metric === "residual_vegetation_pct" ? -trend.slopePerYear : trend.slopePerYear).toFixed(1)} 個百分點/年（${trend.n}個月）`
+    : "近12月有效月份不足";
+  document.querySelector("#s2TrendChart").innerHTML = s2LineChart(s2State.metric, index);
+  document.querySelector("#s2WaterChart").innerHTML = s2WaterChart(index);
+  s2RenderOverview(m);
 
   document.querySelectorAll("[data-s2-metric]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2404,26 +2618,42 @@ function renderSentinel2View() {
       renderSentinel2View();
     });
   });
-  bindS2ChartSelection(document.querySelector("#sentinel2"));
+  document.querySelectorAll("#sentinel2 [data-s2-index]").forEach((node) => {
+    node.addEventListener("click", () => selectS2Observation(Number(node.dataset.s2Index)));
+  });
 }
 
 async function initSentinel2() {
   const page = document.querySelector("#sentinel2");
   if (!page) return;
   try {
-    const response = await fetch("./assets/sentinel2/sentinel2_timeseries.json", { cache: "no-store" });
+    const response = await fetch("./assets/sentinel2/sentinel2_monthly.json", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    s2State.data = await response.json();
-    s2State.index = Math.max(0, s2State.data.observations.length - 1);
-    document.querySelector("#s2DerivedNote").textContent = s2State.data.derived_note;
-    document.querySelector("#s2Limitations").textContent = s2State.data.limitations;
-    document.querySelector("#s2Source").textContent = `資料來源：${s2State.data.source}｜資料更新：${s2State.data.updated_at}`;
+    const data = await response.json();
+    s2State.data = data;
+    const months = data.months;
+    const latest = months.findIndex((m) => m.month === data.latest_usable_month);
+    s2State.index = latest >= 0 ? latest : months.length - 1;
+    const slider = document.querySelector("#s2MonthSlider");
+    slider.max = String(months.length - 1);
+    slider.addEventListener("input", () => selectS2Observation(Number(slider.value)));
+    const usable = months.filter((m) => m.status === "ok" || m.status === "partial").length;
+    document.querySelector("#s2StatusBadge").textContent = `逐月 ${months.length} 個月｜可用 ${usable} 個月`;
+    document.querySelector("#s2StatusNote").textContent = `${data.period.start}～${data.period.end}，每月自動更新`;
+    document.querySelector("#s2MethodBare").textContent = `${data.method.composite}${data.method.bare}`;
+    document.querySelector("#s2DerivedNote").textContent = data.derived_note;
+    document.querySelector("#s2MethodWater").textContent = `${data.method.water}${data.method.new_water}`;
+    document.querySelector("#s2MethodCalib").textContent = data.method.calibration;
+    document.querySelector("#s2Limitations").textContent = `${data.limitations}${data.period.note}`;
+    document.querySelector("#s2Source").textContent = `資料來源：${data.source}｜資料更新：${data.updated_at}`;
     renderSentinel2View();
   } catch (error) {
     document.querySelector("#s2ImagePanels").innerHTML = `<p class="muted-empty">Sentinel-2資料載入失敗：${error.message}</p>`;
   }
 }
 
+document.querySelector("#s2Prev")?.addEventListener("click", () => s2Step(-1));
+document.querySelector("#s2Next")?.addEventListener("click", () => s2Step(1));
 document.querySelector("#s2Play")?.addEventListener("click", () => {
   const button = document.querySelector("#s2Play");
   if (s2State.timer) {
@@ -2433,8 +2663,8 @@ document.querySelector("#s2Play")?.addEventListener("click", () => {
     return;
   }
   button.textContent = "Ⅱ 暫停";
-  selectS2Observation(s2State.index + 1);
-  s2State.timer = setInterval(() => selectS2Observation(s2State.index + 1), 1800);
+  s2Step(1);
+  s2State.timer = setInterval(() => s2Step(1), 900);
 });
 
 renderPendingPoints();

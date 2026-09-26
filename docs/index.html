@@ -504,23 +504,32 @@
         <div class="toolbar-card s2-heading">
           <div>
             <span class="section-kicker">Optical Monitoring</span>
-            <h2>Sentinel-2 NDVI／NDWI 多期監測</h2>
-            <p>用NDVI追蹤崩積區、殘壩區及下游河道的裸露變化與植生覆蓋訊號，並以NDWI判釋堰塞湖水域消長。點選日期或圖表點位，影像與指標會同步切換。</p>
+            <h2>Sentinel-2 逐月 NDVI／NDWI 監測</h2>
+            <p>每月以該月全部Sentinel-2影像去雲合成：NDVI追蹤崩積區、殘壩區及下游河道的裸露與植生恢復趨勢；NDWI／MNDWI判釋堰塞湖水面消長，並掃描全流域是否出現新生水域。拖曳月份或點選圖表，影像與指標同步切換。</p>
           </div>
           <div class="s2-status-block">
-            <span class="s2-status-badge">目前 5 期</span>
-            <small>資料架構已支援後續每月追加</small>
+            <span id="s2StatusBadge" class="s2-status-badge">載入中</span>
+            <small id="s2StatusNote">每月自動更新</small>
           </div>
         </div>
 
         <div class="s2-caveat" role="note">
           <strong>資料完整性說明</strong>
-          <span>現有成果是5個跨季節觀測日，尚不是逐月完整序列；所有變化均屬衛星影像判釋，不能直接視為現地查證結果。</span>
+          <span>月合成仍受雲遮影響，夏季常整月無有效觀測；覆蓋率不足的月份以空心點或灰階標示，僅供參考。所有變化均屬衛星影像判釋，須以UAV與現地調查確認。</span>
         </div>
 
         <div class="s2-controls">
-          <div id="s2Timeline" class="s2-timeline" aria-label="Sentinel-2觀測日期"></div>
-          <button id="s2Play" type="button" class="outline s2-play">▶ 播放時序</button>
+          <div class="s2-month-control">
+            <div class="s2-month-row">
+              <button id="s2Prev" type="button" class="outline s2-step" aria-label="上一個月">‹</button>
+              <label class="s2-month-label" for="s2MonthSlider"><strong id="s2MonthLabel">—</strong><span id="s2MonthSub"></span></label>
+              <button id="s2Next" type="button" class="outline s2-step" aria-label="下一個月">›</button>
+              <input id="s2MonthSlider" class="s2-month-slider" type="range" min="0" max="0" value="0" step="1" aria-label="選擇月份" />
+              <label class="s2-skip"><input id="s2SkipCloudy" type="checkbox" checked /> 略過雲遮月份</label>
+              <button id="s2Play" type="button" class="outline s2-play">▶ 播放時序</button>
+            </div>
+            <div id="s2Timeline" class="s2-quick" aria-label="重點期別快速切換"></div>
+          </div>
         </div>
 
         <div id="s2MetricCards" class="cards metric-cards s2-metric-cards"></div>
@@ -535,6 +544,14 @@
               <span id="s2ObservationCount" class="s2-observation-count"></span>
             </div>
             <div id="s2ImagePanels" class="s2-image-panels"></div>
+            <div class="s2-legend">
+              <span><i class="sw" style="background:#d97706"></i>崩積區</span>
+              <span><i class="sw" style="background:#db2777"></i>殘壩區</span>
+              <span><i class="sw dash"></i>2025堰塞湖最大範圍</span>
+              <span><i class="ramp ndvi"></i>NDVI −0.2 → 0.85（&lt;0.25 裸露）</span>
+              <span><i class="ramp ndwi"></i>NDWI，深藍＝判釋水域</span>
+              <span><i class="sw" style="background:#fff;border:1px solid #c9d3d9"></i>白色＝雲遮無觀測</span>
+            </div>
             <p id="s2Insight" class="s2-insight"></p>
           </article>
 
@@ -542,23 +559,48 @@
             <div class="s2-card-head">
               <div>
                 <span class="section-kicker">Interactive trend</span>
-                <h3>裸露／植生覆蓋時序</h3>
+                <h3>裸露／植生恢復趨勢</h3>
               </div>
+              <span id="s2TrendNote" class="s2-observation-count"></span>
             </div>
             <div id="s2MetricTabs" class="s2-metric-tabs" aria-label="切換指標"></div>
             <div id="s2TrendChart" class="s2-chart" aria-live="polite"></div>
             <div id="s2WaterChart" class="s2-chart s2-water-chart" aria-live="polite"></div>
+            <div class="s2-chart-legend">
+              <span><i class="dot"></i>月合成（實心：有效覆蓋≥40%）</span>
+              <span><i class="dot hollow"></i>覆蓋不足</span>
+              <span><i class="diamond"></i>簡報單景判釋值</span>
+            </div>
           </article>
         </div>
 
+        <article class="s2-overview-card">
+          <div class="s2-card-head">
+            <div>
+              <span class="section-kicker">Watershed water scan</span>
+              <h3>全流域新生水域偵測</h3>
+            </div>
+            <span id="s2NewWaterBadge" class="s2-observation-count"></span>
+          </div>
+          <div class="s2-overview-grid">
+            <div id="s2Overview" class="s2-overview-map"></div>
+            <div>
+              <p class="s2-overview-note">與2015–2025年6月事件前基準水域比對，標出面積≥1 ha、寬度約50 m以上的新增水體。<b class="nw-new">紅色</b>為新生水域候選（前後月份持續出現，需人工確認），<b class="nw-lake">藍色</b>為既有堰塞湖區，<b class="nw-slide">褐色</b>為崩積／殘壩區表面積水，<b class="nw-down">灰色</b>為河道水域變遷或單月孤立訊號。以2025堰塞湖盲測，系統於114/08首度偵測（54.6 ha）。</p>
+              <div id="s2NewWaterList" class="s2-newwater-list"></div>
+            </div>
+          </div>
+        </article>
+
         <div class="s2-method-grid">
           <article class="module-card">
-            <div class="module-title"><span class="icon green">葉</span><h3>植生恢復如何判讀</h3></div>
-            <p id="s2DerivedNote"></p>
+            <div class="module-title"><span class="icon green">葉</span><h3>裸露與植生恢復</h3></div>
+            <p id="s2MethodBare"></p>
+            <p id="s2DerivedNote" class="s2-small"></p>
           </article>
           <article class="module-card">
-            <div class="module-title"><span class="icon blue">水</span><h3>NDWI湖面消長</h3></div>
-            <p>以有效像元判釋壩區水域面積；雲遮較多的期別以「至少」呈現，避免把被遮蔽水面誤當成不存在。</p>
+            <div class="module-title"><span class="icon blue">水</span><h3>湖面消長與新生水域</h3></div>
+            <p id="s2MethodWater"></p>
+            <p id="s2MethodCalib" class="s2-small"></p>
           </article>
           <article class="module-card">
             <div class="module-title"><span class="icon orange">限</span><h3>判釋限制</h3></div>

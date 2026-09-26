@@ -2275,3 +2275,120 @@ input, select, textarea {
   .s2-chart-point-group circle,
   .s2-water-bar rect { transition: none; }
 }
+
+/* Sentinel-2 monthly series (2015–2026) */
+.s2-month-control { flex: 1; display: grid; gap: 10px; min-width: 0; }
+.s2-month-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #d7e1e7;
+  border-radius: 11px;
+  background: #fff;
+}
+.s2-step { width: 38px; height: 38px; padding: 0; font-size: 22px; line-height: 1; }
+.s2-month-label { display: grid; min-width: 104px; text-align: center; cursor: default; }
+.s2-month-label strong { font-size: 20px; color: #173e56; }
+.s2-month-label span { color: #6f8190; font-size: 12px; }
+.s2-month-slider { flex: 1 1 240px; min-width: 160px; accent-color: #226c45; }
+.s2-skip { display: flex; align-items: center; gap: 5px; color: #496273; font-size: 13px; white-space: nowrap; }
+.s2-quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.s2-quick .s2-time-button { padding: 7px 11px; min-width: 104px; }
+.s2-quick .s2-time-button strong { font-size: 13px; }
+.s2-metric-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.s2-metric-card {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  padding: 13px 14px 12px 18px;
+  border: 1px solid #d7e1e7;
+  border-radius: 11px;
+  background: #fff;
+}
+.s2-metric-card > span { color: #496273; font-size: 13px; font-weight: 700; }
+.s2-metric-card > strong { color: #173e56; font-size: 24px; line-height: 1.2; }
+.s2-metric-card .s2-cov { display: block; margin-top: 3px; font-size: 11px; color: #8796a1; }
+.s2-metric-card.low strong { color: #94a3ad; }
+.s2-metric-card.red::before { background: #dc2626; }
+.s2-metric-card.red strong { color: #b91c1c; }
+.s2-metric-card.green::before { background: #268454; }
+.s2-image-panel svg { aspect-ratio: auto; height: auto; }
+.s2-ov-debris, .s2-ov-residual, .s2-ov-lake, .s2-ov-ws, .s2-ov-down, .s2-ov-view { fill: none; vector-effect: non-scaling-stroke; }
+.s2-ov-debris { stroke: #f59e0b; stroke-width: 2.2; }
+.s2-ov-residual { stroke: #ec4899; stroke-width: 2.2; }
+.s2-ov-lake { stroke: #0ea5e9; stroke-width: 1.6; stroke-dasharray: 5 4; }
+.s2-ov-ws { stroke: #173e56; stroke-width: 1.6; }
+.s2-ov-down { stroke: #64748b; stroke-width: 1.2; stroke-dasharray: 3 3; }
+.s2-ov-view { stroke: #d97706; stroke-width: 1.4; stroke-dasharray: 8 4; }
+.s2-empty-text { fill: #6b7c88; font-size: 34px; font-family: inherit; }
+.s2-legend, .s2-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+  color: #56697a;
+  font-size: 12px;
+}
+.s2-legend span, .s2-chart-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.s2-legend .sw { display: inline-block; width: 14px; height: 4px; border-radius: 2px; }
+.s2-legend .sw.dash { height: 0; border-top: 2px dashed #0ea5e9; }
+.s2-legend .ramp { display: inline-block; width: 46px; height: 9px; border-radius: 3px; }
+.s2-legend .ramp.ndvi { background: linear-gradient(90deg, #8c5a1e, #c79a55, #efdcae, #cfe3a8, #5fae5f, #0b5d1e); }
+.s2-legend .ramp.ndwi { background: linear-gradient(90deg, #f4f4f4, #bcd3ea, #5b9bd5, #1565c0); }
+.s2-chart-legend .dot { width: 8px; height: 8px; border-radius: 50%; background: #d97706; }
+.s2-chart-legend .dot.hollow { background: #fff; border: 1.5px solid #9aa9b3; }
+.s2-chart-legend .diamond { width: 8px; height: 8px; transform: rotate(45deg); border: 1.5px solid #173e56; background: #fff; }
+.s2-year-tick { stroke: #e8eef1; stroke-width: 1; }
+.s2-event-line { stroke: #c85252; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.s2-event-label { fill: #b04545; font-size: 10.5px; font-family: inherit; font-weight: 700; }
+.s2-dot { fill: var(--series-color); }
+.s2-dot.hollow { fill: #fff; stroke: #9aa9b3; stroke-width: 1.2; }
+.s2-dot.selected { stroke: #173e56; stroke-width: 2.5; filter: drop-shadow(0 0 4px rgba(23,62,86,.4)); }
+.s2-ref { fill: #fff; stroke: #173e56; stroke-width: 1.6; }
+.s2-selected-line { stroke: #173e56; stroke-width: 1; opacity: .35; }
+.s2-hit { fill: transparent; cursor: pointer; }
+.s2-hit:hover { fill: rgba(23,62,86,.07); }
+.s2-wbar { fill: #159bc6; }
+.s2-wbar.minimum { fill: #8fd0e6; }
+.s2-wbar.low { fill: #c7d2d8; }
+.s2-wbar.selected { fill: #0b5f86; }
+.s2-overview-card {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #d7e1e7;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(31,58,75,.06);
+}
+.s2-overview-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
+.s2-overview-map svg { display: block; width: 100%; height: auto; border: 1px solid #cfd9de; border-radius: 9px; background: #eef3f4; }
+.s2-nw-mark circle { fill: none; stroke-width: 3; }
+.s2-nw-mark text { font-size: 22px; font-weight: 800; font-family: inherit; paint-order: stroke; stroke: #fff; stroke-width: 4px; }
+.s2-overview-note { margin: 0 0 10px; color: #4d6273; font-size: 13px; line-height: 1.6; }
+.nw-new { color: #dc2626; }
+.nw-lake { color: #1d6fd8; }
+.nw-slide { color: #a16207; }
+.nw-down { color: #64748b; }
+.s2-nw-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.s2-nw-table th, .s2-nw-table td { padding: 6px 7px; border-bottom: 1px solid #e3eaee; text-align: left; }
+.s2-nw-table th { color: #5d7180; font-weight: 700; }
+.s2-nw-chip { display: inline-block; padding: 2px 7px; border-radius: 999px; background: #f1f5f8; font-weight: 700; font-size: 11.5px; }
+.s2-nw-chip.nw-new { background: #fde8e8; }
+.s2-nw-chip.nw-lake { background: #e6f0fc; }
+.s2-nw-chip.nw-slide { background: #fbf1dc; }
+.s2-observation-count.alert { background: #fde8e8; color: #b91c1c; }
+.s2-warn { color: #b91c1c; }
+.s2-small { margin-top: 8px; color: #6c7d89; font-size: 12.5px; }
+
+@media (max-width: 1180px) {
+  .s2-metric-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .s2-overview-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .s2-metric-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .s2-month-slider { order: 5; flex-basis: 100%; }
+  .s2-image-panel svg { aspect-ratio: auto; }
+}
