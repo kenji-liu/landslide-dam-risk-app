@@ -1,6 +1,6 @@
 {
-  "updated": "2026-09-26 08:23",
-  "processed_at": "2026-09-26 08:23",
+  "updated": "2026-09-26 08:42",
+  "processed_at": "2026-09-26 08:42",
   "freshness": {
     "status": "current",
     "label": "資料在有效期內",
@@ -11,7 +11,7 @@
     "message": "最後觀測距今 10 天，尚未超過 14 天門檻。"
   },
   "ingest": {
-    "checked_at": "2026-09-26T08:23:40+08:00",
+    "checked_at": "2026-09-26T08:42:47+08:00",
     "status": "ready",
     "message": "最新相鄰配對 2026-09-04→2026-09-16 已在本機，可供監測分析。",
     "latest_available_acquisition": "2026-09-16",
@@ -64,5 +64,13 @@
       "chart": "assets/monitor/chart_堰塞湖區.png",
       "data": "assets/monitor/data_堰塞湖區.json"
     }
-  ]
+  ],
+  "alert": {
+    "level": "green",
+    "label": "綠色正常",
+    "triggered_count": 0,
+    "triggered_points": [],
+    "action": "維持例行監測。",
+    "disclaimer": "警戒為人工查證觸發，不等同已確認災害。"
+  }
 }
