@@ -1690,11 +1690,86 @@ document.querySelector("#shClearCreds").addEventListener("click", () => {
   setSentinelHubStatus("已清除連線設定。", null);
 });
 
+function monitorEscapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function deriveMonitorAlert(data) {
+  if (data.alert?.level) return data.alert;
+  const points = data.points || [];
+  const red = points.filter((point) => point.level_class === "danger");
+  const yellow = points.filter((point) => point.level_class === "warn");
+  if (red.length) {
+    return {
+      level: "red", label: "紅色查證", triggered_points: [...red, ...yellow],
+      action: "立即調閱最新光學影像、雨量與水位資料，並評估UAV或現地查證。",
+      disclaimer: "警戒為人工查證觸發，不等同已確認災害。"
+    };
+  }
+  if (yellow.length) {
+    return {
+      level: "yellow", label: "黃色關注", triggered_points: yellow,
+      action: "加密追蹤下一期影像，並以光學影像、雨量、水位或UAV交叉查核。",
+      disclaimer: "警戒為人工查證觸發，不等同已確認災害。"
+    };
+  }
+  return {
+    level: "green", label: "目前無警戒", triggered_points: [],
+    action: "維持例行監測。", disclaimer: ""
+  };
+}
+
+function renderMonitorAlert(element, data) {
+  if (!element) return;
+  const alert = deriveMonitorAlert(data);
+  const thresholds = data.thresholds || {};
+  const freshness = data.freshness || {};
+  const points = alert.triggered_points || [];
+  const isAlert = alert.level === "yellow" || alert.level === "red";
+  const thresholdText = alert.level === "red"
+    ? `紅色門檻：連續${thresholds.red_run ?? 3}期低於${thresholds.red_db ?? -15} dB，或單期低於${thresholds.red_single_db ?? -20} dB`
+    : alert.level === "yellow"
+      ? `黃色門檻：連續${thresholds.yellow_run ?? 2}期低於${thresholds.yellow_db ?? -10} dB`
+      : `黃色：連續${thresholds.yellow_run ?? 2}期低於${thresholds.yellow_db ?? -10} dB；紅色：連續${thresholds.red_run ?? 3}期低於${thresholds.red_db ?? -15} dB或單期低於${thresholds.red_single_db ?? -20} dB`;
+  const pointMarkup = points.length
+    ? `<div class="monitor-alert-points">${points.map((point) => `
+        <article>
+          <strong>${monitorEscapeHtml(point.name)}</strong>
+          <span>${monitorEscapeHtml(point.latest)}</span>
+          <small>${monitorEscapeHtml(point.reason)}</small>
+        </article>`).join("")}</div>`
+    : "";
+  const staleNote = freshness.status === "stale"
+    ? `<p class="monitor-alert-stale">資料已延遲 ${monitorEscapeHtml(freshness.latency_days)} 天，目前警戒不能代表即時現況。</p>`
+    : "";
+
+  element.className = `monitor-alert-banner ${alert.level}`;
+  element.setAttribute("role", isAlert ? "alert" : "status");
+  element.innerHTML = `
+    <div class="monitor-alert-heading">
+      <span class="monitor-alert-icon" aria-hidden="true">${alert.level === "green" ? "✓" : "!"}</span>
+      <div><strong>${monitorEscapeHtml(alert.label)}</strong><small>${monitorEscapeHtml(thresholdText)}</small></div>
+      <span class="monitor-alert-pair">${monitorEscapeHtml(freshness.latest_pair || "尚無最新配對")}</span>
+    </div>
+    ${pointMarkup}
+    <p class="monitor-alert-action"><strong>${isAlert ? "建議處置：" : "監測狀態："}</strong>${monitorEscapeHtml(alert.action)}</p>
+    ${staleNote}
+    ${alert.disclaimer ? `<small class="monitor-alert-disclaimer">${monitorEscapeHtml(alert.disclaimer)}</small>` : ""}
+  `;
+  element.hidden = false;
+}
+
 function renderMonitor() {
   const cardsEl = document.querySelector("#monitorCards");
   const chartsEl = document.querySelector("#monitorCharts");
   const updatedEl = document.querySelector("#monitorUpdated");
   const freshnessEl = document.querySelector("#monitorFreshness");
+  const alertEl = document.querySelector("#monitorAlertBanner");
   if (!cardsEl || !chartsEl) return;
   initMonitorLocalPanel();
   fetch("./monitor_status.json", { cache: "no-store" })
@@ -1725,6 +1800,7 @@ function renderMonitor() {
           ${ingestLine}
         `;
       }
+      renderMonitorAlert(alertEl, data);
       cardsEl.innerHTML = data.points.map((p) => `
         <div class="card">
           <strong>${p.name}</strong>
