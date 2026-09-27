@@ -3143,11 +3143,14 @@ async function s2LatestReport() {
   const box = document.querySelector("#s2LatestReport");
   if (!box) return;
   try {
-    const r = await fetch("./assets/sentinel2/reports/latest_report.json", { cache: "no-store" });
-    if (!r.ok) return;
+    const ep = await s2EndpointReady();
+    if (!ep) return;
+    const r = await fetch(ep, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "latest_report" }) });
     const info = await r.json();
-    box.innerHTML = `目前最新報告：<b>${s2Esc(info.roc_month)}（${s2Esc(info.month)}）</b>｜產製 ${s2Esc(info.generated_at)}｜<a href="./assets/sentinel2/reports/${encodeURIComponent(info.pdf)}" target="_blank" rel="noopener">下載 PDF</a>`;
-  } catch (e) { /* 尚無報告 */ }
+    box.textContent = info.available
+      ? `可立即寄送的最新報告：${info.roc_month}（${info.month}）｜保存於 ${String(info.stored_at || "").slice(0, 16).replace("T", " ")}（報告僅存於管理者雲端硬碟，不公開）`
+      : "尚無已保存的報告（每月排程執行後會自動保存）。";
+  } catch (e) { /* 服務未更新 */ }
 }
 s2LatestReport();
 
