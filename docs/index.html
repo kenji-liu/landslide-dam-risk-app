@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260927-s2nocmp" />
+    <link rel="stylesheet" href="./styles.css?v=20260927-s2mail" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -604,6 +604,27 @@
           </div>
         </article>
 
+        <article class="s2-overview-card s2-mail-card">
+          <div class="s2-card-head">
+            <div>
+              <span class="section-kicker">Monthly report</span>
+              <h3>月報寄送名單</h3>
+            </div>
+            <span id="s2MailStatus" class="s2-observation-count">載入中</span>
+          </div>
+          <p class="s2-overview-note">每月自動更新後，系統會產生 PDF 月報（指標、影像、趨勢、新生水域清單）並寄給管理者與以下登記的信箱。新增或移除信箱需輸入權限密碼；密碼於伺服器端驗證，連續錯誤 5 次將暫停 30 分鐘。</p>
+          <form id="s2MailForm" class="s2-mail-form" autocomplete="off">
+            <label>E-mail<input id="s2MailEmail" type="email" placeholder="name@example.com" maxlength="254" /></label>
+            <label>權限密碼<input id="s2MailPass" type="password" autocomplete="off" maxlength="64" /></label>
+            <div class="s2-mail-actions">
+              <button type="submit" data-mail-action="subscribe">新增寄送</button>
+              <button type="button" class="outline" data-mail-action="unsubscribe">移除</button>
+              <button type="button" class="outline" data-mail-action="list">查看名單</button>
+            </div>
+          </form>
+          <div id="s2MailResult" class="s2-mail-result" aria-live="polite"></div>
+        </article>
+
         <div class="s2-method-grid">
           <article class="module-card">
             <div class="module-title"><span class="icon green">葉</span><h3>裸露與植生恢復</h3></div>
@@ -677,6 +698,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260927-s2nocmp"></script>
+    <script src="./app.js?v=20260927-s2mail"></script>
   </body>
 </html>

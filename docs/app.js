@@ -2860,6 +2860,64 @@ async function initSentinel2() {
   }
 }
 
+// ---- 月報寄送名單（Google Apps Script，密碼於伺服器端驗證） ----
+const s2Mail = { endpoint: null };
+
+async function initS2Mail() {
+  const status = document.querySelector("#s2MailStatus");
+  if (!status) return;
+  try {
+    const r = await fetch("./assets/sentinel2/report_mailer.json", { cache: "no-store" });
+    if (r.ok) s2Mail.endpoint = (await r.json()).endpoint || null;
+  } catch (e) { /* 尚未設定 */ }
+  const ready = !!s2Mail.endpoint;
+  status.textContent = ready ? "寄送服務已啟用" : "寄送服務設定中";
+  document.querySelectorAll("#s2MailForm input, #s2MailForm button").forEach((el) => { el.disabled = !ready; });
+}
+
+function s2MailShow(msg, tone) {
+  const box = document.querySelector("#s2MailResult");
+  box.className = `s2-mail-result ${tone || ""}`;
+  box.innerHTML = msg;
+}
+
+async function s2MailAction(action) {
+  if (!s2Mail.endpoint) return;
+  const email = document.querySelector("#s2MailEmail").value.trim();
+  const password = document.querySelector("#s2MailPass").value;
+  if (action !== "list" && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { s2MailShow("請輸入正確的 E-mail。", "bad"); return; }
+  if (!password) { s2MailShow("請輸入權限密碼。", "bad"); return; }
+  s2MailShow("處理中…");
+  try {
+    const r = await fetch(s2Mail.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action, email, password })
+    });
+    const res = await r.json();
+    if (!res.ok) { s2MailShow(res.error || "操作失敗。", "bad"); return; }
+    if (action === "list") {
+      const list = res.recipients || [];
+      s2MailShow(list.length
+        ? `<strong>目前名單（${list.length}）：</strong><ul>${list.map((x) => `<li>${x.email.replace(/[<>&]/g, "")}<small>　${(x.added || "").slice(0, 10)}</small></li>`).join("")}</ul><small>另含管理者信箱。</small>`
+        : "名單目前沒有登記信箱（管理者信箱固定寄送）。", "good");
+    } else {
+      s2MailShow(res.message || "完成。", "good");
+      document.querySelector("#s2MailEmail").value = "";
+    }
+  } catch (e) {
+    s2MailShow(`無法連線寄送服務：${e.message}`, "bad");
+  } finally {
+    document.querySelector("#s2MailPass").value = "";
+  }
+}
+
+document.querySelector("#s2MailForm")?.addEventListener("submit", (e) => { e.preventDefault(); s2MailAction("subscribe"); });
+document.querySelectorAll("#s2MailForm [data-mail-action]").forEach((b) => {
+  if (b.type !== "submit") b.addEventListener("click", () => s2MailAction(b.dataset.mailAction));
+});
+initS2Mail();
+
 document.querySelector("#s2Prev")?.addEventListener("click", () => s2Step(-1));
 document.querySelector("#s2Next")?.addEventListener("click", () => s2Step(1));
 document.querySelector("#s2Play")?.addEventListener("click", () => {

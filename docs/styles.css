@@ -2478,3 +2478,15 @@ body.s2-lb-open { overflow: hidden; }
   .s2-lb-tools { margin-left: 0; }
   .s2-legend-tip { margin-left: 0; }
 }
+
+/* 月報寄送名單 */
+.s2-mail-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.s2-mail-form label { display: grid; gap: 4px; color: #496273; font-size: 12.5px; font-weight: 700; }
+.s2-mail-form input { min-width: 240px; padding: 8px 10px; border: 1px solid #cbd8df; border-radius: 8px; font: inherit; }
+.s2-mail-form input:disabled, .s2-mail-form button:disabled { opacity: .55; cursor: not-allowed; }
+.s2-mail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.s2-mail-result { margin-top: 10px; font-size: 13px; color: #365165; }
+.s2-mail-result.good { color: #166534; }
+.s2-mail-result.bad { color: #b91c1c; }
+.s2-mail-result ul { margin: 6px 0; padding-left: 18px; }
+@media (max-width: 760px) { .s2-mail-form input { min-width: 0; width: 100%; } .s2-mail-form label { width: 100%; } }
