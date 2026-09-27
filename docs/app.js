@@ -2380,7 +2380,7 @@ function s2LineChart(metricKey, selectedIndex) {
   const selMark = `<line class="s2-selected-line" x1="${x(selectedIndex)}" y1="${margin.top}" x2="${x(selectedIndex)}" y2="${height - margin.bottom}"></line>` +
     (sel?.v != null ? `<circle class="s2-dot selected" cx="${x(selectedIndex)}" cy="${y(sel.v)}" r="6"></circle>
       <text class="s2-point-value" x="${Math.min(x(selectedIndex), width - 40)}" y="${y(sel.v) - 11}" text-anchor="middle">${sel.v.toFixed(1)}</text>` : "");
-  return `<div class="s2-chart-title"><strong>${def.label}</strong><span>單位：%｜橫軸：民國年</span></div>
+  return `<div class="s2-chart-title"><strong>${def.label}</strong><span>單位：%｜橫軸：民國年<button type="button" class="s2-expand" data-s2-zoom="chart-trend" title="放大圖表">⤢ 放大</button></span></div>
     <svg viewBox="0 0 ${width} ${height}" class="s2-chart-svg" aria-label="${def.label}逐月時序圖">
       <g class="s2-chart-grid">${grid}</g>
       <g>${s2Axis(months, x, height, margin)}</g>
@@ -2426,7 +2426,7 @@ function s2WaterChart(selectedIndex) {
   const sel = months[selectedIndex];
   const selLabel = sel?.water_area_ha != null
     ? `<text class="s2-point-value" x="${Math.min(x(selectedIndex), width - 40)}" y="${y(sel.water_area_ha) - 8}" text-anchor="middle">${sel.water_area_is_minimum ? "≥" : ""}${sel.water_area_ha.toFixed(1)}</text>` : "";
-  return `<div class="s2-chart-title"><strong>壩區水域面積（MNDWI＋NDWI）</strong><span>單位：ha｜淺色＝雲遮下限值</span></div>
+  return `<div class="s2-chart-title"><strong>壩區水域面積（MNDWI＋NDWI）</strong><span>單位：ha｜淺色＝雲遮下限值<button type="button" class="s2-expand" data-s2-zoom="chart-water" title="放大圖表">⤢ 放大</button></span></div>
     <svg viewBox="0 0 ${width} ${height}" class="s2-chart-svg" aria-label="壩區水域面積逐月時序圖">
       <g class="s2-chart-grid">${grid}</g>
       <g>${s2Axis(months, x, height, margin)}</g>
@@ -2437,49 +2437,114 @@ function s2WaterChart(selectedIndex) {
     </svg>`;
 }
 
+const s2Layers = {
+  tc: { label: "真色影像", extent: "view" },
+  ndvi: { label: "NDVI 裸露／植生", extent: "view" },
+  ndwi: { label: "NDWI 水域", extent: "view" },
+  overview: { label: "全流域 真色＋水域", extent: "overview" },
+  overview_ndvi: { label: "全流域 NDVI 裸露", extent: "overview" }
+};
+
 function s2Rings(overlay, w, h) {
-  return overlay.rings.map((ring) => ring.map(([px, py]) => `${(px * w).toFixed(1)},${(py * h).toFixed(1)}`).join(" "));
+  return (overlay?.rings || []).map((ring) => ring.map(([px, py]) => `${(px * w).toFixed(1)},${(py * h).toFixed(1)}`).join(" "));
 }
 
-function s2ImagePanel(label, href, m) {
-  const view = s2State.data.view;
+function s2RingLabelPos(overlay, w, h, where = "center") {
+  const rings = overlay?.rings || [];
+  if (!rings.length) return null;
+  const ring = rings.reduce((a, b) => (b.length > a.length ? b : a));
+  const xs = ring.map((p) => p[0]); const ys = ring.map((p) => p[1]);
+  const x = ((Math.min(...xs) + Math.max(...xs)) / 2) * w;
+  if (where === "below") return { x: Math.min(Math.max(x, 260), w - 260), y: Math.min(Math.max(...ys) * h + 30, h - 12) };
+  return { x, y: ((Math.min(...ys) + Math.max(...ys)) / 2) * h };
+}
+
+// 同一個SVG建構器供縮圖與放大檢視共用，確保兩者內容一致
+function s2FigureSvg(layer, m, opts = {}) {
+  const data = s2State.data;
+  const ext = s2Layers[layer].extent;
+  const meta = ext === "view" ? data.view : data.overview;
   const w = 1000;
-  const h = +(w / view.aspect).toFixed(1);
-  const ov = view.overlays;
+  const h = +(w / meta.aspect).toFixed(1);
+  const ov = meta.overlays;
   const poly = (key, cls) => s2Rings(ov[key], w, h).map((pts) => `<polygon class="${cls}" points="${pts}"></polygon>`).join("");
-  const body = href
-    ? `<image href="${href}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"></image>
-       ${poly("lake_max", "s2-ov-lake")}${poly("debris", "s2-ov-debris")}${poly("residual", "s2-ov-residual")}`
-    : `<rect width="${w}" height="${h}" fill="#eef2f4"></rect><text x="${w / 2}" y="${h / 2}" text-anchor="middle" class="s2-empty-text">本月無可用影像（整月雲遮）</text>`;
-  return `<figure class="s2-image-panel">
-      <figcaption>${label}</figcaption>
-      <svg viewBox="0 0 ${w} ${h}" aria-label="${m.roc_month} ${label}">${body}</svg>
+  const label = (key, text, cls, where) => {
+    const p = s2RingLabelPos(ov[key], w, h, where);
+    return p ? `<text class="s2-map-label ${cls}" x="${p.x}" y="${p.y}" text-anchor="middle">${text}</text>` : "";
+  };
+  const href = m.images?.[layer];
+  if (!href) {
+    return `<svg viewBox="0 0 ${w} ${h}" aria-label="${m.roc_month} ${s2Layers[layer].label}"><rect width="${w}" height="${h}" fill="#eef2f4"></rect>
+      <text x="${w / 2}" y="${h / 2}" text-anchor="middle" class="s2-empty-text">${m.status === "no_scene" ? "本月無Sentinel-2影像" : "本月無可用影像（整月雲遮）"}</text></svg>`;
+  }
+  let body = `<image href="${href}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"></image>`;
+  if (ext === "view") {
+    body += poly("downstream", "s2-ov-downstream") + poly("lake_max", "s2-ov-lake") + poly("debris", "s2-ov-debris") + poly("residual", "s2-ov-residual");
+    if (opts.labels) body += label("debris", "崩積區", "debris") + label("residual", "殘壩區", "residual") + label("downstream", "下游裸露計算範圍", "downstream");
+  } else {
+    body += poly("downstream", "s2-ov-downstream-fill") + poly("watershed", "s2-ov-ws") + poly("view", "s2-ov-view")
+      + poly("lake_max", "s2-ov-lake") + poly("debris", "s2-ov-debris") + poly("residual", "s2-ov-residual");
+    body += label("downstream", "下游裸露計算範圍（土砂堆積＋沖淤調節區）", "downstream", "below");
+    if (opts.marks !== false) {
+      body += (m.new_water || []).map((f, i) => {
+        const c = s2NewWaterClass[f.class] || s2NewWaterClass.new_candidate;
+        const r = Math.max(9, Math.min(30, Math.sqrt(f.area_ha) * 5));
+        return `<g class="s2-nw-mark"><circle cx="${f.ox * w}" cy="${f.oy * h}" r="${r}" stroke="${c.color}"></circle>
+          <text x="${f.ox * w + r + 3}" y="${f.oy * h + 4}" fill="${c.color}">${i + 1}</text><title>${c.label} ${f.area_ha} ha</title></g>`;
+      }).join("");
+    }
+  }
+  // 影像時間戳記
+  const scenes = m.scenes || [];
+  const range = scenes.length ? `${scenes[0].date.slice(5).replace("-", "/")}–${scenes[scenes.length - 1].date.slice(5).replace("-", "/")}` : "";
+  const stamp = `${m.roc_month} 月合成${range ? `｜${range}` : ""}｜${m.n_scenes || 0}景`;
+  if (opts.stamp) body += `<g class="s2-stamp"><rect x="10" y="10" width="${stamp.length * 15 + 22}" height="34" rx="6"></rect><text x="21" y="33">${stamp}</text></g>`;
+  return `<svg viewBox="0 0 ${w} ${h}" aria-label="${m.roc_month} ${s2Layers[layer].label}">${body}</svg>`;
+}
+
+function s2ImagePanel(layer, m) {
+  return `<figure class="s2-image-panel s2-zoomable" data-s2-zoom="${layer}" tabindex="0" role="button" aria-label="放大 ${s2Layers[layer].label}">
+      <figcaption>${s2Layers[layer].label}<span class="s2-zoom-hint">⤢</span></figcaption>
+      ${s2FigureSvg(layer, m)}
     </figure>`;
 }
 
-function s2RenderOverview(m) {
-  const ovData = s2State.data.overview;
-  const w = 1000;
-  const h = +(w / ovData.aspect).toFixed(1);
-  const rings = (key, cls) => s2Rings(ovData.overlays[key], w, h).map((pts) => `<polygon class="${cls}" points="${pts}"></polygon>`).join("");
-  const found = m.new_water || [];
-  const marks = found.map((f, i) => {
-    const c = s2NewWaterClass[f.class] || s2NewWaterClass.new_candidate;
-    const r = Math.max(9, Math.min(30, Math.sqrt(f.area_ha) * 5));
-    return `<g class="s2-nw-mark"><circle cx="${f.ox * w}" cy="${f.oy * h}" r="${r}" stroke="${c.color}"></circle>
-      <text x="${f.ox * w + r + 3}" y="${f.oy * h + 4}" fill="${c.color}">${i + 1}</text><title>${c.label} ${f.area_ha} ha</title></g>`;
+function s2DetectionTimeline(index) {
+  const months = s2Months();
+  const cells = months.map((m, i) => {
+    const cls = (m.new_water || []).map((f) => f.class);
+    let tone = "none"; let tip = "無影像";
+    if (m.images && !m.water_scanned) { tone = "cloud"; tip = "雲遮過多未掃描"; }
+    else if (m.water_scanned) {
+      tone = "clear"; tip = "未見需關注水體";
+      if (cls.includes("known_lake")) { tone = "lake"; tip = "既有堰塞湖區水域"; }
+      if (cls.includes("new_candidate")) { tone = "new"; tip = "新生水域候選"; }
+    }
+    return `<button type="button" class="s2-dt-cell ${tone}${i === index ? " selected" : ""}" data-s2-index="${i}" title="${m.roc_month} ${tip}"></button>`;
   }).join("");
-  const img = m.images ? `<image href="${m.images.overview}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"></image>`
-    : `<rect width="${w}" height="${h}" fill="#eef2f4"></rect><text x="${w / 2}" y="${h / 2}" text-anchor="middle" class="s2-empty-text">本月無可用影像</text>`;
-  document.querySelector("#s2Overview").innerHTML = `<svg viewBox="0 0 ${w} ${h}" aria-label="${m.roc_month} 全流域水域偵測">
-      ${img}${rings("watershed", "s2-ov-ws")}${rings("downstream", "s2-ov-down")}${rings("view", "s2-ov-view")}${rings("lake_max", "s2-ov-lake")}${marks}
-    </svg>`;
+  const axis = months.map((m, i) => (m.month.endsWith("-01")
+    ? `<span style="left:${((i + 0.5) / months.length * 100).toFixed(2)}%">${Number(m.month.slice(0, 4)) - 1911}</span>` : "")).join("");
+  return `<div class="s2-dt-strip">${cells}</div><div class="s2-dt-axis">${axis}<em>民國年</em></div>
+    <div class="s2-dt-legend"><span><i class="new"></i>新生水域候選</span><span><i class="lake"></i>既有湖區有水</span><span><i class="clear"></i>已掃描無異常</span><span><i class="cloud"></i>雲遮未掃描</span><span><i class="none"></i>無影像</span></div>`;
+}
+
+function s2RenderOverview(m, index) {
+  const layer = s2State.ovLayer || "overview";
+  document.querySelector("#s2OverviewTabs").innerHTML = ["overview", "overview_ndvi"].map((k) =>
+    `<button type="button" data-s2-ovlayer="${k}" class="${k === layer ? "active" : ""}">${k === "overview" ? "真色＋水域" : "NDVI 裸露（看下游）"}</button>`).join("");
+  const scenes = m.scenes || [];
+  document.querySelector("#s2OverviewTime").innerHTML = `<strong>${m.roc_month}</strong>（${m.month}）月合成
+    ${scenes.length ? `｜影像日期：${scenes.map((s) => s.date.slice(5).replace("-", "/")).join("、")}` : "｜本月無可用影像"}${m.final ? "" : "｜暫定"}`;
+  document.querySelector("#s2Overview").innerHTML = `<div class="s2-zoomable" data-s2-zoom="${layer}" tabindex="0" role="button" aria-label="放大全流域圖">${s2FigureSvg(layer, m, { stamp: true })}</div>`;
+  document.querySelector("#s2DetectionTimeline").innerHTML = s2DetectionTimeline(index);
+
+  const found = m.new_water || [];
   const nNew = found.filter((f) => f.class === "new_candidate").length;
   const badge = document.querySelector("#s2NewWaterBadge");
   badge.textContent = !m.images ? "本月無觀測" : !m.water_scanned ? "雲遮過多，本月未掃描" : nNew ? `新生水域候選 ${nNew} 處` : "未偵測到新生水域候選";
   badge.classList.toggle("alert", nNew > 0);
   const routine = found.filter((f) => f.class === "downstream_channel" || f.class === "transient");
-  const notable = found.map((f, i) => ({ ...f, n: i + 1 })).filter((f) => !routine.includes(found[f.n - 1]));
+  const notable = found.map((f, i) => ({ ...f, n: i + 1 })).filter((f) => f.class !== "downstream_channel" && f.class !== "transient");
   const routineNote = routine.length
     ? `<p class="s2-small">另有 ${routine.length} 處河道水域變遷／單月孤立訊號（地圖灰圈，共 ${routine.reduce((a, f) => a + f.area_ha, 0).toFixed(1)} ha），屬河道擺盪或雲影，不列入警示。</p>` : "";
   document.querySelector("#s2NewWaterList").innerHTML = !m.images
@@ -2493,6 +2558,201 @@ function s2RenderOverview(m) {
           }).join("")}</tbody></table>`
         : `<p class="muted-empty">本月無需關注的新增水體。</p>`) + routineNote;
 }
+
+// ---- 與簡報數字統一對照 ----
+function s2DiffCell(d, unit) {
+  if (d == null) return `<td class="num muted">—</td>`;
+  const a = Math.abs(d);
+  const tone = unit === "%" ? (a <= 1.5 ? "good" : a <= 4 ? "warn" : "bad") : (a <= 3.5 ? "good" : a <= 10 ? "warn" : "bad");
+  return `<td class="num diff ${tone}">${d > 0 ? "+" : ""}${d.toFixed(1)}</td>`;
+}
+
+function s2RenderComparison() {
+  const cmp = s2State.data.slide_comparison;
+  const box = document.querySelector("#s2Comparison");
+  if (!box) return;
+  if (!cmp) { box.innerHTML = `<p class="muted-empty">尚無對照資料。</p>`; return; }
+  const covTxt = (c) => (c == null ? "" : `<small>覆蓋${Math.round(c * 100)}%</small>`);
+  const body = cmp.rows.map((r) => cmp.metrics.map((mt, j) => {
+    const v = r.metrics[mt.key];
+    const i = s2Months().findIndex((m) => m.month === r.date.slice(0, 7));
+    const head = j === 0 ? `<td rowspan="${cmp.metrics.length}" class="s2-cmp-date"><button type="button" class="linkish" data-s2-index="${i}">${r.roc_date}</button><small>${r.phase}</small></td>` : "";
+    return `<tr class="${j === 0 ? "grp" : ""}">${head}<td>${mt.label}</td>
+      <td class="num">${v.slide_is_minimum ? "≥" : ""}${v.slide}${mt.unit === "ha" ? " ha" : ""}</td>
+      <td class="num">${v.scene ?? "—"}${covTxt(v.scene_coverage)}</td>${s2DiffCell(v.scene_diff, mt.unit)}
+      <td class="num">${v.month ?? "—"}${covTxt(v.month_coverage)}</td>${s2DiffCell(v.month_diff, mt.unit)}</tr>`;
+  }).join("")).join("");
+  const o = cmp.outline;
+  box.innerHTML = `<div class="s2-cmp-grid">
+    <div class="s2-cmp-table-wrap">
+      <p class="s2-cmp-summary">${cmp.summary}</p>
+      <table class="s2-cmp-table"><thead><tr><th>日期／期別</th><th>指標</th><th>簡報值</th><th>本系統同日單景</th><th>差距</th><th>本系統當月月合成</th><th>差距</th></tr></thead><tbody>${body}</tbody></table>
+      <p class="s2-small">差距＝本系統−簡報值；綠色 ≤1.5 個百分點（水域 ≤3.5 ha）、黃色 ≤4、紅色 &gt;4。同日單景採用與逐月序列相同的區域輪廓與去雲規則；月合成為當月全部影像中位數，本來就會與單日影像不同。<a href="./assets/sentinel2/slide_comparison.csv" download>下載對照表 CSV</a></p>
+    </div>
+    <div class="s2-cmp-outline">
+      <figure class="s2-zoomable s2-static-fig" data-s2-zoom="verify" tabindex="0" role="button" aria-label="放大輪廓校核圖">
+        <img src="${o.figure}" alt="崩積區與殘壩區輪廓校核圖" loading="lazy" />
+        <figcaption>輪廓校核：青色＝本系統，橘／桃紅＝簡報原圖<span class="s2-zoom-hint">⤢</span></figcaption>
+      </figure>
+      <ul class="s2-outline-facts">
+        <li>崩積區 <b>${o.debris_ha} ha</b>、殘壩區 <b>${o.residual_ha} ha</b>，合計 <b>${o.r1_total_ha} ha</b>（${o.r1_reference}）</li>
+        <li>與前版輪廓 IoU：崩積區 ${o.iou_vs_v1.debris}、殘壩區 ${o.iou_vs_v1.residual}，最大邊界差 ≤${o.max_boundary_diff_m} m</li>
+        <li>${o.method}</li>
+      </ul>
+    </div>
+  </div>`;
+}
+
+// ---- 點選放大檢視 ----
+const s2Zoom = { layer: null, scale: 1, x: 0, y: 0, drag: null, kind: "map" };
+
+function s2EnsureLightbox() {
+  let lb = document.querySelector("#s2Lightbox");
+  if (lb) return lb;
+  lb = document.createElement("div");
+  lb.id = "s2Lightbox";
+  lb.className = "s2-lightbox";
+  lb.hidden = true;
+  lb.innerHTML = `<div class="s2-lb-bar">
+      <div class="s2-lb-title"><strong id="s2LbTitle"></strong><span id="s2LbSub"></span></div>
+      <div id="s2LbLayers" class="s2-lb-layers"></div>
+      <div class="s2-lb-tools">
+        <button type="button" data-lb="prev" title="上一個月（←）">‹ 上月</button>
+        <button type="button" data-lb="next" title="下一個月（→）">下月 ›</button>
+        <button type="button" data-lb="out" title="縮小（−）">−</button>
+        <button type="button" data-lb="reset" title="原尺寸（0）">1:1</button>
+        <button type="button" data-lb="in" title="放大（+）">＋</button>
+        <button type="button" data-lb="close" class="close" title="關閉（Esc）">✕</button>
+      </div>
+    </div>
+    <div class="s2-lb-stage" id="s2LbStage"><div class="s2-lb-canvas" id="s2LbCanvas"></div></div>
+    <p class="s2-lb-help">滾輪或＋／−縮放、拖曳平移、雙擊放大；← → 切換月份，Esc 關閉</p>`;
+  document.body.appendChild(lb);
+  lb.querySelector(".s2-lb-bar").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.lbLayer) { s2Zoom.layer = b.dataset.lbLayer; s2RenderLightbox(); return; }
+    const act = b.dataset.lb;
+    if (act === "close") s2CloseLightbox();
+    else if (act === "prev" || act === "next") { s2Step(act === "prev" ? -1 : 1); s2RenderLightbox(); }
+    else if (act === "in") s2ZoomBy(1.4);
+    else if (act === "out") s2ZoomBy(1 / 1.4);
+    else if (act === "reset") { Object.assign(s2Zoom, { scale: 1, x: 0, y: 0 }); s2ApplyZoom(); }
+  });
+  const stage = lb.querySelector("#s2LbStage");
+  stage.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    s2ZoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2);
+  }, { passive: false });
+  stage.addEventListener("dblclick", (e) => {
+    const r = stage.getBoundingClientRect();
+    s2ZoomBy(1.8, e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2);
+  });
+  stage.addEventListener("pointerdown", (e) => {
+    s2Zoom.drag = { x: e.clientX, y: e.clientY, ox: s2Zoom.x, oy: s2Zoom.y };
+    stage.setPointerCapture(e.pointerId); stage.classList.add("dragging");
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!s2Zoom.drag) return;
+    s2Zoom.x = s2Zoom.drag.ox + (e.clientX - s2Zoom.drag.x);
+    s2Zoom.y = s2Zoom.drag.oy + (e.clientY - s2Zoom.drag.y);
+    s2ApplyZoom();
+  });
+  const end = () => { s2Zoom.drag = null; stage.classList.remove("dragging"); };
+  stage.addEventListener("pointerup", end);
+  stage.addEventListener("pointercancel", end);
+  lb.addEventListener("click", (e) => { if (e.target === lb) s2CloseLightbox(); });
+  document.addEventListener("keydown", (e) => {
+    if (lb.hidden) return;
+    if (e.key === "Escape") s2CloseLightbox();
+    else if (e.key === "ArrowLeft" && s2Zoom.kind === "map") { s2Step(-1); s2RenderLightbox(); }
+    else if (e.key === "ArrowRight" && s2Zoom.kind === "map") { s2Step(1); s2RenderLightbox(); }
+    else if (e.key === "+" || e.key === "=") s2ZoomBy(1.4);
+    else if (e.key === "-") s2ZoomBy(1 / 1.4);
+    else if (e.key === "0") { Object.assign(s2Zoom, { scale: 1, x: 0, y: 0 }); s2ApplyZoom(); }
+  });
+  return lb;
+}
+
+function s2ZoomBy(f, cx = 0, cy = 0) {
+  const ns = Math.max(1, Math.min(12, s2Zoom.scale * f));
+  const k = ns / s2Zoom.scale;
+  s2Zoom.x = cx - (cx - s2Zoom.x) * k;
+  s2Zoom.y = cy - (cy - s2Zoom.y) * k;
+  s2Zoom.scale = ns;
+  if (ns === 1) { s2Zoom.x = 0; s2Zoom.y = 0; }
+  s2ApplyZoom();
+}
+
+function s2ApplyZoom() {
+  const c = document.querySelector("#s2LbCanvas");
+  if (c) c.style.transform = `translate(${s2Zoom.x}px, ${s2Zoom.y}px) scale(${s2Zoom.scale})`;
+  const sub = document.querySelector("#s2LbSub");
+  if (sub) sub.dataset.zoom = `${Math.round(s2Zoom.scale * 100)}%`;
+}
+
+function s2RenderLightbox() {
+  const lb = s2EnsureLightbox();
+  const m = s2Months()[s2State.index];
+  const canvas = lb.querySelector("#s2LbCanvas");
+  const layersBox = lb.querySelector("#s2LbLayers");
+  lb.querySelectorAll('[data-lb="prev"],[data-lb="next"]').forEach((b) => { b.hidden = s2Zoom.kind !== "map"; });
+  if (s2Zoom.kind === "map") {
+    lb.querySelector("#s2LbTitle").textContent = `${m.roc_month}（${m.month}）${s2Layers[s2Zoom.layer].label}`;
+    lb.querySelector("#s2LbSub").textContent = m.n_scenes ? `${m.n_scenes}景：${(m.scenes || []).map((s) => s.date.slice(5)).join("、")}` : "本月無可用影像";
+    layersBox.innerHTML = Object.entries(s2Layers).map(([k, v]) =>
+      `<button type="button" data-lb-layer="${k}" class="${k === s2Zoom.layer ? "active" : ""}">${v.label}</button>`).join("");
+    canvas.innerHTML = s2FigureSvg(s2Zoom.layer, m, { labels: true, stamp: true });
+  } else if (s2Zoom.kind === "verify") {
+    lb.querySelector("#s2LbTitle").textContent = "崩積區／殘壩區輪廓校核（簡報圖3-29 全15面板）";
+    lb.querySelector("#s2LbSub").textContent = "青色＝本系統投票輪廓；橘／桃紅＝簡報原圖";
+    layersBox.innerHTML = "";
+    canvas.innerHTML = `<img src="${s2State.data.slide_comparison.outline.figure}" alt="輪廓校核圖" draggable="false" />`;
+  } else {
+    const src = document.querySelector(s2Zoom.kind === "chart-trend" ? "#s2TrendChart" : "#s2WaterChart");
+    lb.querySelector("#s2LbTitle").textContent = src.querySelector(".s2-chart-title strong")?.textContent || "圖表";
+    lb.querySelector("#s2LbSub").textContent = `目前選取：${m.roc_month}`;
+    layersBox.innerHTML = "";
+    canvas.innerHTML = src.querySelector("svg").outerHTML;
+  }
+  // 依圖幅長寬比設定畫布寬度，讓整張圖剛好塞進視窗
+  let aspect = 1.32;
+  if (s2Zoom.kind === "map") aspect = (s2Layers[s2Zoom.layer].extent === "view" ? s2State.data.view : s2State.data.overview).aspect;
+  else if (s2Zoom.kind === "verify") aspect = 1878 / 2503;
+  else { const vb = canvas.querySelector("svg")?.viewBox?.baseVal; if (vb) aspect = vb.width / vb.height; }
+  canvas.style.width = `min(96vw, calc((100vh - 130px) * ${aspect.toFixed(4)}))`;
+  s2ApplyZoom();
+}
+
+function s2OpenLightbox(kind) {
+  const lb = s2EnsureLightbox();
+  Object.assign(s2Zoom, { scale: 1, x: 0, y: 0 });
+  if (s2Layers[kind]) { s2Zoom.kind = "map"; s2Zoom.layer = kind; } else { s2Zoom.kind = kind; }
+  lb.hidden = false;
+  document.body.classList.add("s2-lb-open");
+  s2RenderLightbox();
+  lb.querySelector('[data-lb="close"]').focus();
+}
+
+function s2CloseLightbox() {
+  const lb = document.querySelector("#s2Lightbox");
+  if (!lb) return;
+  lb.hidden = true;
+  document.body.classList.remove("s2-lb-open");
+}
+
+document.querySelector("#sentinel2")?.addEventListener("click", (e) => {
+  const z = e.target.closest("[data-s2-zoom]");
+  if (z) { s2OpenLightbox(z.dataset.s2Zoom); return; }
+  const idx = e.target.closest("[data-s2-index]");
+  if (idx) { selectS2Observation(Number(idx.dataset.s2Index)); return; }
+  const ovl = e.target.closest("[data-s2-ovlayer]");
+  if (ovl) { s2State.ovLayer = ovl.dataset.s2Ovlayer; renderSentinel2View(); }
+});
+document.querySelector("#sentinel2")?.addEventListener("keydown", (e) => {
+  const z = e.target.closest("[data-s2-zoom]");
+  if (z && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); s2OpenLightbox(z.dataset.s2Zoom); }
+});
 
 function s2Insight(m, index) {
   if (!m.images) return `<strong>判讀：</strong>${m.roc_month} 查無有效Sentinel-2觀測（${m.status === "no_scene" ? "無影像" : "整月雲遮"}），指標沿用前後月份判讀。`;
@@ -2518,7 +2778,14 @@ function s2Insight(m, index) {
 function s2Trend12(key, covKey, index) {
   const months = s2Months();
   const pts = [];
-  for (let i = Math.max(0, index - 11); i <= index; i += 1) {
+  // 視窗若跨過事件月份（崩塌成湖、潰決），只取事件後月份，避免把事件本身當成趨勢
+  let start = Math.max(0, index - 11);
+  (s2State.data.events || []).forEach((ev) => {
+    const e = months.findIndex((m) => m.month === ev.month);
+    if (e >= 0 && e <= index && e + 1 > start) start = e + 1;
+  });
+  s2State.trendStart = start;
+  for (let i = start; i <= index; i += 1) {
     const m = months[i];
     if (m[key] != null && (m.coverage?.[covKey] ?? 0) >= S2_USABLE_COVERAGE) pts.push([i, m[key]]);
   }
@@ -2593,12 +2860,7 @@ function renderSentinel2View() {
   document.querySelector("#s2ObservationCount").textContent = m.n_scenes ? `${m.n_scenes} 景：${dates}` : "0 景";
   document.querySelector("#s2Insight").innerHTML = s2Insight(m, index);
 
-  const img = m.images || {};
-  document.querySelector("#s2ImagePanels").innerHTML = [
-    s2ImagePanel("真色影像", img.tc, m),
-    s2ImagePanel("NDVI 裸露／植生", img.ndvi, m),
-    s2ImagePanel("NDWI 水域", img.ndwi, m)
-  ].join("");
+  document.querySelector("#s2ImagePanels").innerHTML = ["tc", "ndvi", "ndwi"].map((k) => s2ImagePanel(k, m)).join("");
 
   document.querySelector("#s2MetricTabs").innerHTML = Object.entries(s2MetricDefs).map(([key, def]) => `
     <button type="button" data-s2-metric="${key}" class="${key === s2State.metric ? "active" : ""}">${def.label}</button>`).join("");
@@ -2606,20 +2868,17 @@ function renderSentinel2View() {
   const trendKey = s2State.metric === "residual_vegetation_pct" ? "residual_bare_pct" : s2State.metric;
   const trend = s2Trend12(trendKey, def.cov, index);
   document.querySelector("#s2TrendNote").textContent = trend
-    ? `近12月${s2State.metric === "residual_vegetation_pct" ? "植生" : "裸露"}趨勢 ${(s2State.metric === "residual_vegetation_pct" ? -trend.slopePerYear : trend.slopePerYear) > 0 ? "+" : ""}${(s2State.metric === "residual_vegetation_pct" ? -trend.slopePerYear : trend.slopePerYear).toFixed(1)} 個百分點/年（${trend.n}個月）`
-    : "近12月有效月份不足";
+    ? `近12月${s2State.trendStart > Math.max(0, index - 11) ? "（事件後）" : ""}${s2State.metric === "residual_vegetation_pct" ? "植生" : "裸露"}趨勢 ${(s2State.metric === "residual_vegetation_pct" ? -trend.slopePerYear : trend.slopePerYear) > 0 ? "+" : ""}${(s2State.metric === "residual_vegetation_pct" ? -trend.slopePerYear : trend.slopePerYear).toFixed(1)} 個百分點/年（${trend.n}個月）`
+    : "近12月（事件後）有效月份不足，暫不計趨勢";
   document.querySelector("#s2TrendChart").innerHTML = s2LineChart(s2State.metric, index);
   document.querySelector("#s2WaterChart").innerHTML = s2WaterChart(index);
-  s2RenderOverview(m);
+  s2RenderOverview(m, index);
 
   document.querySelectorAll("[data-s2-metric]").forEach((button) => {
     button.addEventListener("click", () => {
       s2State.metric = button.dataset.s2Metric;
       renderSentinel2View();
     });
-  });
-  document.querySelectorAll("#sentinel2 [data-s2-index]").forEach((node) => {
-    node.addEventListener("click", () => selectS2Observation(Number(node.dataset.s2Index)));
   });
 }
 
@@ -2647,6 +2906,7 @@ async function initSentinel2() {
     document.querySelector("#s2Limitations").textContent = `${data.limitations}${data.period.note}`;
     document.querySelector("#s2Source").textContent = `資料來源：${data.source}｜資料更新：${data.updated_at}`;
     renderSentinel2View();
+    s2RenderComparison();
   } catch (error) {
     document.querySelector("#s2ImagePanels").innerHTML = `<p class="muted-empty">Sentinel-2資料載入失敗：${error.message}</p>`;
   }

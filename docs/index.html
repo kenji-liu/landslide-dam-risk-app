@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260926-s2monthly" />
+    <link rel="stylesheet" href="./styles.css?v=20260927-s2zoom2" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -548,9 +548,11 @@
               <span><i class="sw" style="background:#d97706"></i>崩積區</span>
               <span><i class="sw" style="background:#db2777"></i>殘壩區</span>
               <span><i class="sw dash"></i>2025堰塞湖最大範圍</span>
+              <span><i class="sw dash blue"></i>下游裸露計算範圍</span>
               <span><i class="ramp ndvi"></i>NDVI −0.2 → 0.85（&lt;0.25 裸露）</span>
               <span><i class="ramp ndwi"></i>NDWI，深藍＝判釋水域</span>
               <span><i class="sw" style="background:#fff;border:1px solid #c9d3d9"></i>白色＝雲遮無觀測</span>
+              <span class="s2-legend-tip">點選任一影像可放大檢視</span>
             </div>
             <p id="s2Insight" class="s2-insight"></p>
           </article>
@@ -582,13 +584,35 @@
             </div>
             <span id="s2NewWaterBadge" class="s2-observation-count"></span>
           </div>
+          <div class="s2-overview-toolbar">
+            <p id="s2OverviewTime" class="s2-overview-time"></p>
+            <div class="s2-overview-nav">
+              <div id="s2OverviewTabs" class="s2-metric-tabs" aria-label="切換總覽圖層"></div>
+              <button type="button" class="outline s2-step" onclick="s2Step(-1)" aria-label="上一個月">‹</button>
+              <button type="button" class="outline s2-step" onclick="s2Step(1)" aria-label="下一個月">›</button>
+            </div>
+          </div>
           <div class="s2-overview-grid">
-            <div id="s2Overview" class="s2-overview-map"></div>
+            <div>
+              <div id="s2Overview" class="s2-overview-map"></div>
+              <div id="s2DetectionTimeline" class="s2-detection-timeline" aria-label="逐月新生水域偵測時間軸"></div>
+            </div>
             <div>
               <p class="s2-overview-note">與2015–2025年6月事件前基準水域比對，標出面積≥1 ha、寬度約50 m以上的新增水體。<b class="nw-new">紅色</b>為新生水域候選（前後月份持續出現，需人工確認），<b class="nw-lake">藍色</b>為既有堰塞湖區，<b class="nw-slide">褐色</b>為崩積／殘壩區表面積水，<b class="nw-down">灰色</b>為河道水域變遷或單月孤立訊號。以2025堰塞湖盲測，系統於114/08首度偵測（54.6 ha）。</p>
               <div id="s2NewWaterList" class="s2-newwater-list"></div>
             </div>
           </div>
+        </article>
+
+        <article class="s2-overview-card s2-comparison-card">
+          <div class="s2-card-head">
+            <div>
+              <span class="section-kicker">Slide cross-check</span>
+              <h3>與簡報圖3-29數字統一對照</h3>
+            </div>
+            <span class="s2-observation-count">輪廓＋五期數值</span>
+          </div>
+          <div id="s2Comparison"></div>
         </article>
 
         <div class="s2-method-grid">
@@ -665,6 +689,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260926-s2monthly"></script>
+    <script src="./app.js?v=20260927-s2zoom2"></script>
   </body>
 </html>
