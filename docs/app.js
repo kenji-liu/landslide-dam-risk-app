@@ -2873,6 +2873,53 @@ async function initS2Mail() {
   const ready = !!s2Mail.endpoint;
   status.textContent = ready ? "寄送服務已啟用" : "寄送服務設定中";
   document.querySelectorAll("#s2MailForm input, #s2MailForm button").forEach((el) => { el.disabled = !ready; });
+  if (!ready) return;
+  try {
+    const st = await s2MailPost({ action: "status" });
+    if (st.ok && !st.password_set) s2MailShowSetup();
+  } catch (e) { /* 查詢失敗時維持一般表單 */ }
+}
+
+async function s2MailPost(payload) {
+  const r = await fetch(s2Mail.endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  });
+  return r.json();
+}
+
+// 首次使用：尚未設定權限密碼時，改顯示一次性的密碼設定表單（設定後即無法由網頁更改）
+function s2MailShowSetup() {
+  document.querySelector("#s2MailStatus").textContent = "請先設定權限密碼";
+  document.querySelector("#s2MailForm").hidden = true;
+  const box = document.querySelector("#s2MailResult");
+  box.className = "s2-mail-result";
+  box.innerHTML = `<form id="s2MailSetup" class="s2-mail-form" autocomplete="off">
+      <label>設定權限密碼<input id="s2SetPass1" type="password" autocomplete="new-password" minlength="6" maxlength="64" /></label>
+      <label>再輸入一次<input id="s2SetPass2" type="password" autocomplete="new-password" minlength="6" maxlength="64" /></label>
+      <div class="s2-mail-actions"><button type="submit">設定權限密碼</button></div>
+    </form>
+    <p class="s2-small">首次使用需設定一次（6–64 字元）。設定後網頁無法再更改，如需修改請至 Apps Script「專案設定 → 指令碼屬性」。</p>
+    <div id="s2SetResult" class="s2-mail-result" aria-live="polite"></div>`;
+  document.querySelector("#s2MailSetup").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const p1 = document.querySelector("#s2SetPass1").value;
+    const p2 = document.querySelector("#s2SetPass2").value;
+    const out = document.querySelector("#s2SetResult");
+    if (p1.length < 6) { out.className = "s2-mail-result bad"; out.textContent = "權限密碼至少 6 個字元。"; return; }
+    if (p1 !== p2) { out.className = "s2-mail-result bad"; out.textContent = "兩次輸入不一致。"; return; }
+    out.className = "s2-mail-result"; out.textContent = "設定中…";
+    try {
+      const res = await s2MailPost({ action: "set_password", password: p1 });
+      if (!res.ok) { out.className = "s2-mail-result bad"; out.textContent = res.error || "設定失敗。"; return; }
+      document.querySelector("#s2MailForm").hidden = false;
+      document.querySelector("#s2MailStatus").textContent = "寄送服務已啟用";
+      s2MailShow("權限密碼已設定完成，現在可以新增寄送信箱。", "good");
+    } catch (err) {
+      out.className = "s2-mail-result bad"; out.textContent = `無法連線寄送服務：${err.message}`;
+    }
+  });
 }
 
 function s2MailShow(msg, tone) {
@@ -2889,12 +2936,7 @@ async function s2MailAction(action) {
   if (!password) { s2MailShow("請輸入權限密碼。", "bad"); return; }
   s2MailShow("處理中…");
   try {
-    const r = await fetch(s2Mail.endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action, email, password })
-    });
-    const res = await r.json();
+    const res = await s2MailPost({ action, email, password });
     if (!res.ok) { s2MailShow(res.error || "操作失敗。", "bad"); return; }
     if (action === "list") {
       const list = res.recipients || [];
