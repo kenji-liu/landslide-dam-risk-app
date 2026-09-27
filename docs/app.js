@@ -2447,11 +2447,18 @@ const s2Layers = {
   overview_ndvi: { label: "全流域 NDVI 裸露", extent: "overview" },
   zanom: { label: "NDVI 異常 z-score", extent: "view" },
   recovery: { label: "R1 復育分區", extent: "view" },
-  overview_zanom: { label: "全流域 NDVI 異常", extent: "overview" }
+  overview_zanom: { label: "全流域 NDVI 異常", extent: "overview" },
+  dprev: { label: "與上月比 NDVI 變化", extent: "view" },
+  overview_dprev: { label: "全流域 與上月比", extent: "overview" }
 };
 
 // 變化圖層疊在當月衛星真色上（透明度由滑桿控制）
-const S2_BLEND = { zanom: "tc", recovery: "tc", overview_zanom: "overview" };
+const S2_BLEND = { zanom: "tc", recovery: "tc", overview_zanom: "overview", dprev: "tc", overview_dprev: "overview" };
+const s2VegModes = { base: "與往年同月比", prev: "與上個月比" };
+
+function s2VegList(m, mode = s2State.vegMode || "base") {
+  return (mode === "prev" ? m?.mom?.blocks : m?.ndvi_anomaly?.candidates) || [];
+}
 const S2_PITCH_HA = 0.714;   // 標準足球場 105 × 68 m
 
 function s2LL2px(meta, lat, lon) {
@@ -2482,9 +2489,9 @@ function s2MarkSvg({ x, y, r, color, label, on, dim, attrs, title, square }) {
     <text x="${x + r + 5}" y="${y + 7}" fill="${color}">${label}</text><title>${title}</title></g>`;
 }
 
-function s2AnomMarks(m, meta, w, h, isView) {
-  const list = m.ndvi_anomaly?.candidates || [];
-  const sel = s2State.anomMonth === m.month ? s2State.anomSel : null;
+function s2AnomMarks(m, mode, meta, w, h, isView) {
+  const list = s2VegList(m, mode);
+  const sel = s2State.anomKey === `${m.month}|${mode}` ? s2State.anomSel : null;
   return list.map((f, i) => {
     const p = s2LL2px(meta, f.lat, f.lon) || (isView ? null : { x: f.ox, y: f.oy });
     if (!s2Inside(p)) return "";
@@ -2534,12 +2541,12 @@ function s2FigureSvg(layer, m, opts = {}) {
   if (ext === "view") {
     body += poly("downstream", "s2-ov-downstream") + poly("lake_max", "s2-ov-lake") + poly("debris", "s2-ov-debris") + poly("residual", "s2-ov-residual");
     if (opts.labels) body += label("debris", "崩積區", "debris") + label("residual", "殘壩區", "residual") + label("downstream", "下游裸露計算範圍", "downstream");
-    if (layer === "zanom" && opts.marks !== false) body += s2AnomMarks(m, meta, w, h, true);
+    if ((layer === "zanom" || layer === "dprev") && opts.marks !== false) body += s2AnomMarks(m, layer === "dprev" ? "prev" : "base", meta, w, h, true);
   } else {
     body += poly("downstream", "s2-ov-downstream-fill") + poly("watershed", "s2-ov-ws") + poly("view", "s2-ov-view")
       + poly("lake_max", "s2-ov-lake") + poly("debris", "s2-ov-debris") + poly("residual", "s2-ov-residual");
     body += label("downstream", "下游裸露計算範圍（土砂堆積＋沖淤調節區）", "downstream", "below");
-    if (opts.marks !== false && layer === "overview_zanom") body += s2AnomMarks(m, meta, w, h, false);
+    if (opts.marks !== false && (layer === "overview_zanom" || layer === "overview_dprev")) body += s2AnomMarks(m, layer === "overview_dprev" ? "prev" : "base", meta, w, h, false);
     else if (opts.marks !== false) {
       const anomMode = false;
       const markList = anomMode ? (m.ndvi_anomaly?.candidates || []) : (m.new_water || []);
@@ -2790,6 +2797,10 @@ function s2CloseLightbox() {
 }
 
 document.querySelector("#sentinel2")?.addEventListener("click", (e) => {
+  const vs = e.target.closest("[data-veg-step]");
+  if (vs) { if (!vs.disabled) s2Step(Number(vs.dataset.vegStep)); return; }
+  const vm = e.target.closest("[data-veg-mode]");
+  if (vm) { s2State.vegMode = vm.dataset.vegMode; s2RenderAnomaly(s2Months()[s2State.index]); return; }
   const mk = e.target.closest("[data-anom-i]");
   if (mk && mk.closest("#s2AnomFigure")) { s2SelectAnom(Number(mk.dataset.anomI), "map"); return; }
   const zb = e.target.closest("[data-anom-zoom]");
@@ -2803,7 +2814,10 @@ document.querySelector("#sentinel2")?.addEventListener("click", (e) => {
   const ovl = e.target.closest("[data-s2-ovlayer]");
   if (ovl) { s2State.ovLayer = ovl.dataset.s2Ovlayer; renderSentinel2View(); return; }
   const anl = e.target.closest("[data-s2-anomlayer]");
-  if (anl && !anl.disabled) { s2State.anomLayer = anl.dataset.s2Anomlayer; renderSentinel2View(); }
+  if (anl && !anl.disabled) {
+    if (s2State.vegMode === "prev") s2State.momLayer = anl.dataset.s2Anomlayer; else s2State.anomLayer = anl.dataset.s2Anomlayer;
+    s2RenderAnomaly(s2Months()[s2State.index]);
+  }
 });
 document.querySelector("#sentinel2")?.addEventListener("keydown", (e) => {
   const row = e.target.closest("[data-anom-row]");
@@ -3043,11 +3057,15 @@ async function s2MailAction(action) {
   if (!s2Mail.endpoint) return;
   const email = document.querySelector("#s2MailEmail").value.trim();
   const password = document.querySelector("#s2MailPass").value;
-  if (action !== "list" && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { s2MailShow("請輸入正確的 E-mail。", "bad"); return; }
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+  if (action === "send_now") {
+    if (email && !validEmail) { s2MailShow("E-mail 格式不正確（空白＝寄給全部名單）。", "bad"); return; }
+  } else if (action !== "list" && !validEmail) { s2MailShow("請輸入正確的 E-mail。", "bad"); return; }
   if (!password) { s2MailShow("請輸入權限密碼。", "bad"); return; }
-  s2MailShow("處理中…");
+  if (action === "send_now" && !window.confirm(`確定要立即寄送最新月報？\n${email ? `只寄給：${email}` : "寄給：管理者＋名單內所有信箱"}`)) return;
+  s2MailShow(action === "send_now" ? "寄送中（約 10–30 秒）…" : "處理中…");
   try {
-    const res = await s2MailPost({ action, email, password });
+    const res = await s2MailPost(action === "send_now" ? { action, password, email: email || "" } : { action, email, password });
     if (!res.ok) { s2MailShow(res.error || "操作失敗。", "bad"); return; }
     if (action === "list") {
       const list = res.recipients || [];
@@ -3071,6 +3089,18 @@ document.querySelectorAll("#s2MailForm [data-mail-action]").forEach((b) => {
 });
 initS2Mail();
 
+async function s2LatestReport() {
+  const box = document.querySelector("#s2LatestReport");
+  if (!box) return;
+  try {
+    const r = await fetch("./assets/sentinel2/reports/latest_report.json", { cache: "no-store" });
+    if (!r.ok) return;
+    const info = await r.json();
+    box.innerHTML = `目前最新報告：<b>${s2Esc(info.roc_month)}（${s2Esc(info.month)}）</b>｜產製 ${s2Esc(info.generated_at)}｜<a href="./assets/sentinel2/reports/${encodeURIComponent(info.pdf)}" target="_blank" rel="noopener">下載 PDF</a>`;
+  } catch (e) { /* 尚無報告 */ }
+}
+s2LatestReport();
+
 // ================================================================ v3：異常偵測、通報回報、Gemini
 const S2_EVENT_START = "2025-07";
 const s2AnomClass = {
@@ -3082,7 +3112,9 @@ const s2AnomClass = {
   lake: { label: "堰塞湖區（水位變化）", color: "#1d6fd8", tone: "nw-lake" },
   downstream: { label: "下游河道（土砂堆積）", color: "#64748b", tone: "nw-down" },
   channel: { label: "主河道沖刷／擴寬", color: "#64748b", tone: "nw-down" },
-  transient: { label: "單月雜訊（不列警示）", color: "#94a3b8", tone: "nw-down" }
+  transient: { label: "單月雜訊（不列警示）", color: "#94a3b8", tone: "nw-down" },
+  new_bare: { label: "新增裸露（上月有植物）", color: "#dc2626", tone: "nw-new" },
+  recurring: { label: "反覆裸露（可能耕作／季節性）", color: "#94a3b8", tone: "nw-down" }
 };
 
 function s2Esc(v) {
@@ -3095,39 +3127,90 @@ function s2LakeWater(m) {
   return w != null && w >= 0.5 ? w : null;
 }
 
+function s2RocOf(ym) {
+  return s2Months().find((x) => x.month === ym)?.roc_month || ym || "—";
+}
+
 function s2RenderAnomaly(m) {
   const box = document.querySelector("#s2AnomCard");
-  if (!box) return;
-  if (s2State.anomMonth !== m.month) { s2State.anomMonth = m.month; s2State.anomSel = null; }
-  const a = m.ndvi_anomaly;
-  const c = a?.candidates || [];
+  if (!box || !m) return;
+  const mode = s2State.vegMode || "base";
+  const key = `${m.month}|${mode}`;
+  if (s2State.anomKey !== key) { s2State.anomKey = key; s2State.anomSel = null; }
   const sel = s2State.anomSel;
-  const layer = s2State.anomLayer || "zanom";
-  const avail = { zanom: !!m.images?.zanom, overview_zanom: !!m.images?.overview_zanom, recovery: !!m.images?.recovery };
-  const useLayer = avail[layer] ? layer : (avail.zanom ? "zanom" : null);
-  document.querySelector("#s2AnomTabs").innerHTML = [["zanom", "崩塌區近看"], ["overview_zanom", "全流域"], ["recovery", "崩積區復育"]]
-    .map(([k, t]) => `<button type="button" data-s2-anomlayer="${k}" class="${k === useLayer ? "active" : ""}" ${avail[k] ? "" : "disabled"}>${t}</button>`).join("");
+  const months = s2Months();
+  document.querySelector("#s2VegMonth").textContent = `${m.roc_month}（${m.month}）${m.final ? "" : "暫定"}`;
+  document.querySelectorAll("[data-veg-step]").forEach((b) => {
+    const i = s2State.index + Number(b.dataset.vegStep);
+    b.disabled = i < 0 || i >= months.length;
+  });
+  document.querySelector("#s2VegMode").innerHTML = Object.entries(s2VegModes).map(([k, t]) =>
+    `<button type="button" role="tab" data-veg-mode="${k}" class="${k === mode ? "active" : ""}" aria-selected="${k === mode}">${t}</button>`).join("");
+
+  const tabsDef = mode === "prev" ? [["dprev", "崩塌區近看"], ["overview_dprev", "全流域"]]
+    : [["zanom", "崩塌區近看"], ["overview_zanom", "全流域"], ["recovery", "崩積區復育"]];
+  const want = mode === "prev" ? (s2State.momLayer || "dprev") : (s2State.anomLayer || "zanom");
+  const avail = Object.fromEntries(tabsDef.map(([k]) => [k, !!m.images?.[k]]));
+  const useLayer = avail[want] ? want : (avail[tabsDef[0][0]] ? tabsDef[0][0] : (avail[tabsDef[1][0]] ? tabsDef[1][0] : null));
+  document.querySelector("#s2AnomTabs").innerHTML = tabsDef.map(([k, t]) =>
+    `<button type="button" data-s2-anomlayer="${k}" class="${k === useLayer ? "active" : ""}" ${avail[k] ? "" : "disabled"}>${t}</button>`).join("");
   const bw = document.querySelector("#s2AnomBlendWrap");
   if (bw) { bw.hidden = !useLayer; document.querySelector("#s2AnomBlend").value = String(Math.round((s2State.anomAlpha ?? 0.6) * 100)); }
+
+  const mo = m.mom;
+  const emptyMsg = mode === "prev"
+    ? (mo?.skipped ? `無法與上月比較：${s2Esc(mo.skipped)}。` : "本月無與上月比較的資料。")
+    : "本月無植生變化資料（無影像或整月雲遮）。";
   document.querySelector("#s2AnomFigure").innerHTML = useLayer
     ? `<div class="s2-zoomable" data-s2-zoom="${useLayer}" tabindex="0" role="button" aria-label="放大">${s2FigureSvg(useLayer, m, { stamp: true })}</div>`
-    : `<p class="muted-empty">本月無植生變化資料（無影像或整月雲遮）。</p>`;
+      + (mode === "prev" && mo?.prev ? `<p class="s2-small s2-cmp-note">比較：${s2Esc(m.roc_month)} ↔ ${s2Esc(mo.prev_roc || s2RocOf(mo.prev))}${mo.gap > 1 ? `（中間 ${mo.gap - 1} 個月雲遮或品質不足，改與最近一個清晰月份比較）` : ""}</p>` : "")
+    : `<p class="muted-empty">${emptyMsg}</p>`;
+  const marksLegend = `<span><i class="mk" style="border-color:#dc2626"></i>系統標記（編號對應右側清單）</span>`;
   document.querySelector("#s2AnomLegend").innerHTML = useLayer === "recovery"
     ? `<span><i class="sw" style="background:#16a34a"></i>已自然長回植物</span><span><i class="sw" style="background:#facc15"></i>緩慢恢復中</span><span><i class="sw" style="background:#dc2626"></i>仍裸露（建議評估人工植生）</span><span class="s2-small">滑桿往左＝看衛星照片</span>`
-    : `<span><i class="ramp zramp"></i>紅＝植物比往年同月少　綠＝比往年多</span><span><i class="sw" style="background:#d6d3d1"></i>山的陰影／資料不足</span><span><i class="sw" style="background:#fff;border:1px solid #c9d3d9"></i>雲</span><span><i class="mk" style="border-color:#dc2626"></i>系統標記（編號對應右側清單）</span>`;
+    : mode === "prev"
+      ? `<span><i class="ramp dramp"></i>紅＝比上月植物少　綠＝比上月多</span><span><i class="sw" style="background:#d6d3d1"></i>山的陰影</span><span><i class="sw" style="background:#fff;border:1px solid #c9d3d9"></i>任一月有雲</span>${marksLegend}`
+      : `<span><i class="ramp zramp"></i>紅＝植物比往年同月少　綠＝比往年多</span><span><i class="sw" style="background:#d6d3d1"></i>山的陰影／資料不足</span><span><i class="sw" style="background:#fff;border:1px solid #c9d3d9"></i>雲</span>${marksLegend}`;
 
-  // 白話摘要
-  const plain = document.querySelector("#s2AnomPlain");
-  const alert = c.filter((f) => f.class === "new" || f.class === "new_pending");
-  const nConf = c.filter((f) => f.class === "new").length;
-  const nPend = alert.length - nConf;
-  const n = a?.neg_ha || {};
-  const negTotal = (n.r1 || 0) + (n.downstream || 0) + (n.other || 0);
-  const rec = m.recovery?.debris;
-  const recTot = rec ? (rec.natural_ha || 0) + (rec.slow_ha || 0) + (rec.needs_ha || 0) : 0;
-  const pct = (v) => (recTot ? (100 * v) / recTot : 0);
   const tile = (tone, title, value, subTxt) => `<div class="s2-plain-tile ${tone}"><span>${title}</span><strong>${value}</strong><small>${subTxt}</small></div>`;
-  if (plain) {
+  const plain = document.querySelector("#s2AnomPlain");
+  const badge = document.querySelector("#s2AnomBadge");
+  const list = s2VegList(m, mode);
+  let statsHtml = "";
+  let emptyList = "";
+  if (mode === "prev") {
+    const nb = list.filter((b) => b.class === "new_bare");
+    if (!mo || mo.skipped) {
+      plain.innerHTML = tile("grey", "新增裸露區塊", "無法比較", mo?.skipped ? s2Esc(mo.skipped) : "本月無可用衛星影像")
+        + tile("grey", "崩積／殘壩區變化", "—", mo?.prev ? `上一個清晰月份：${s2Esc(s2RocOf(mo.prev))}` : "—")
+        + tile("grey", "下游河道變化", "—", "請改看「與往年同月比」或切換月份");
+      badge.textContent = "本月無法與上月比較";
+      badge.classList.remove("alert");
+    } else {
+      const dec = mo.dec_ha || {}; const inc = mo.inc_ha || {};
+      const pair = (a, b) => `<span class="t-red">−${a ?? 0}</span> ／ <span class="t-green">+${b ?? 0}</span> ha`;
+      plain.innerHTML = tile(nb.length ? "red" : "green", `新增裸露區塊（與 ${s2Esc(mo.prev_roc || s2RocOf(mo.prev))} 比）`, `${nb.length} 處`,
+          nb.length ? "上個月還有植物、這個月變裸露的地點，請對照衛星照片確認" : "沒有發現上個月有植物、這個月變裸露的地點")
+        + tile("amber", "崩積／殘壩區變化", pair(dec.r1, inc.r1), `植物明顯減少／增加的面積（${s2Pitch((dec.r1 || 0) + (inc.r1 || 0))}）`)
+        + tile("amber", "下游河道變化", pair(dec.downstream, inc.downstream), "河道沖淤與河灘植被的增減");
+      badge.textContent = nb.length ? `較上月新增裸露 ${nb.length} 處` : "較上月無新增裸露";
+      badge.classList.toggle("alert", nb.length > 0);
+      statsHtml = `<details class="s2-tech"><summary>技術數據</summary><ul class="s2-anom-facts">
+        <li>比較月份：${s2Esc(m.month)} − ${s2Esc(mo.prev)}（相隔 ${mo.gap} 個月）；參考林兩月整體差 ${mo.ref_shift} 已扣除</li>
+        <li>可比較面積（流域內）${mo.usable_ha} ha；崩積／殘壩區平均 ΔNDVI ${mo.r1_mean_d ?? "—"}</li>
+        <li>流域其他地區 |ΔNDVI| ≥ 0.20：減少 ${dec.other} ha、增加 ${inc.other} ha（已扣局部背景；多為薄雲、霾與光照差異，僅供參考）</li></ul></details>`;
+    }
+    emptyList = "與上個月相比，沒有面積 1 公頃以上新變裸露的區塊。";
+  } else {
+    const a = m.ndvi_anomaly;
+    const alert = list.filter((f) => f.class === "new" || f.class === "new_pending");
+    const nConf = list.filter((f) => f.class === "new").length;
+    const nPend = alert.length - nConf;
+    const n = a?.neg_ha || {};
+    const negTotal = (n.r1 || 0) + (n.downstream || 0) + (n.other || 0);
+    const rec = m.recovery?.debris;
+    const recTot = rec ? (rec.natural_ha || 0) + (rec.slow_ha || 0) + (rec.needs_ha || 0) : 0;
+    const pct = (v) => (recTot ? (100 * v) / recTot : 0);
     plain.innerHTML = [
       tile(!a || a.skipped ? "grey" : alert.length ? "red" : "green", "疑似新崩塌地",
         !a ? "—" : a.skipped ? "暫不判讀" : `${alert.length} 處`,
@@ -3142,31 +3225,28 @@ function s2RenderAnomaly(m) {
             <small>自然長回 ${rec.natural_ha} ha｜緩慢 ${rec.slow_ha} ha｜仍裸露 ${rec.needs_ha} ha</small></div>`
         : tile("grey", "崩積區植物恢復情形", "—", "115/01 起提供（以 114/10–12 為事件後起點）")
     ].join("");
+    badge.textContent = alert.length ? `疑似新崩塌 ${alert.length} 處` : "未發現疑似新崩塌";
+    badge.classList.toggle("alert", alert.length > 0);
+    if (a) {
+      statsHtml = `${a.skipped ? `<p class="s2-skip">本月不列候選：${s2Esc(a.skipped)}（${a.skipped === "基準不足" ? "往年同月份影像不足，無法可靠比較" : "穩定林地的綠度也偏離往年，代表影像受霾或殘雲影響"}）</p>` : ""}
+        <details class="s2-tech"><summary>技術數據</summary><ul class="s2-anom-facts">
+        <li>基準：${s2Esc(a.baseline)}${a.in_baseline ? "（本月位於基準期內）" : ""}</li>
+        <li>可判釋面積 ${a.usable_ha} ha；地形陰影遮罩 ${a.shadow_ha} ha</li>
+        <li>負異常面積（z≤−2、ΔNDVI≤−0.20、NDVI&lt;0.25）：R1 ${n.r1 ?? 0} ha、下游 ${n.downstream ?? 0} ha、其他 ${n.other ?? 0} ha</li>
+        <li>R1 平均 z：${a.r1_mean_z ?? "—"}</li></ul></details>`;
+    }
+    emptyList = a ? "本月沒有面積 1 公頃以上、植物明顯變少的區塊。" : "本月無可判讀影像。";
   }
-  const badge = document.querySelector("#s2AnomBadge");
-  badge.textContent = alert.length ? `疑似新崩塌 ${alert.length} 處` : "未發現疑似新崩塌";
-  badge.classList.toggle("alert", alert.length > 0);
-
-  if (!a) {
-    document.querySelector("#s2AnomStats").innerHTML = "";
-    document.querySelector("#s2AnomList").innerHTML = `<p class="muted-empty">本月無可判讀影像。</p>`;
-  } else {
-    document.querySelector("#s2AnomStats").innerHTML = `${a.skipped ? `<p class="s2-skip">本月不列候選：${s2Esc(a.skipped)}（${a.skipped === "基準不足" ? "往年同月份影像不足，無法可靠比較" : "穩定林地的綠度也偏離往年，代表影像受霾或殘雲影響"}）</p>` : ""}
-      <details class="s2-tech"><summary>技術數據</summary><ul class="s2-anom-facts">
-      <li>基準：${s2Esc(a.baseline)}${a.in_baseline ? "（本月位於基準期內）" : ""}</li>
-      <li>可判釋面積 ${a.usable_ha} ha；地形陰影遮罩 ${a.shadow_ha} ha</li>
-      <li>負異常面積（z≤−2、ΔNDVI≤−0.20、NDVI&lt;0.25）：R1 ${n.r1 ?? 0} ha、下游 ${n.downstream ?? 0} ha、其他 ${n.other ?? 0} ha</li>
-      <li>R1 平均 z：${a.r1_mean_z ?? "—"}</li></ul></details>`;
-    document.querySelector("#s2AnomList").innerHTML = c.length
-      ? `<table class="s2-nw-table s2-anom-table"><thead><tr><th>#</th><th>類型</th><th>面積</th><th>座標</th><th></th></tr></thead><tbody>${c.map((f, i) => {
-          const k = s2AnomClass[f.class] || s2AnomClass.new;
-          return `<tr class="s2-anom-row${sel === i ? " on" : ""}" data-anom-row="${i}" tabindex="0" title="點選在地圖標示">
-            <td><b class="s2-num" style="background:${k.color}">${i + 1}</b></td><td><span class="s2-nw-chip ${k.tone}">${k.label}</span></td>
-            <td>${f.area_ha} ha<br><small>${s2Pitch(f.area_ha)}</small></td><td>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}</td>
-            <td><button type="button" class="outline s2-locate" data-anom-zoom="${i}">放大</button></td></tr>`;
-        }).join("")}</tbody></table>`
-      : `<p class="muted-empty">本月沒有面積 1 公頃以上、植物明顯變少的區塊。</p>`;
-  }
+  document.querySelector("#s2AnomStats").innerHTML = statsHtml;
+  document.querySelector("#s2AnomList").innerHTML = list.length
+    ? `<table class="s2-nw-table s2-anom-table"><thead><tr><th>#</th><th>類型</th><th>面積</th><th>座標</th><th></th></tr></thead><tbody>${list.map((f, i) => {
+        const k = s2AnomClass[f.class] || s2AnomClass.new;
+        return `<tr class="s2-anom-row${sel === i ? " on" : ""}" data-anom-row="${i}" tabindex="0" title="點選在地圖標示">
+          <td><b class="s2-num" style="background:${k.color}">${i + 1}</b></td><td><span class="s2-nw-chip ${k.tone}">${k.label}</span></td>
+          <td>${f.area_ha} ha<br><small>${s2Pitch(f.area_ha)}</small></td><td>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}</td>
+          <td><button type="button" class="outline s2-locate" data-anom-zoom="${i}">放大</button></td></tr>`;
+      }).join("")}</tbody></table>`
+    : `<p class="muted-empty">${emptyList}</p>`;
   const r = m.recovery;
   document.querySelector("#s2RecoveryStats").innerHTML = r
     ? `<table class="s2-nw-table"><thead><tr><th>分區</th><th>已自然長回</th><th>緩慢恢復</th><th>仍裸露（建議評估人工植生）</th></tr></thead><tbody>
@@ -3179,14 +3259,22 @@ function s2RenderAnomaly(m) {
 
 function s2SelectAnom(i, from) {
   const m = s2Months()[s2State.index];
-  const f = m?.ndvi_anomaly?.candidates?.[i];
+  const mode = s2State.vegMode || "base";
+  const f = s2VegList(m, mode)[i];
   if (!f) return;
-  s2State.anomMonth = m.month;
+  s2State.anomKey = `${m.month}|${mode}`;
   s2State.anomSel = s2State.anomSel === i && from === "list" ? null : i;
   // 目前圖層看不到這個點 → 自動切到看得到的圖層
   const inView = s2Inside(s2LL2px(s2State.data.view, f.lat, f.lon));
-  const cur = s2State.anomLayer || "zanom";
-  if (s2State.anomSel != null && (cur === "recovery" || (cur === "zanom" && !inView))) s2State.anomLayer = inView ? "zanom" : "overview_zanom";
+  if (s2State.anomSel != null) {
+    if (mode === "prev") {
+      const cur = s2State.momLayer || "dprev";
+      if (cur === "dprev" && !inView) s2State.momLayer = "overview_dprev";
+    } else {
+      const cur = s2State.anomLayer || "zanom";
+      if (cur === "recovery" || (cur === "zanom" && !inView)) s2State.anomLayer = inView ? "zanom" : "overview_zanom";
+    }
+  }
   s2RenderAnomaly(m);
   if (from === "map") document.querySelector(`[data-anom-row="${i}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   else document.querySelector("#s2AnomFigure")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -3194,15 +3282,18 @@ function s2SelectAnom(i, from) {
 
 function s2ZoomAnom(i) {
   const m = s2Months()[s2State.index];
-  const f = m?.ndvi_anomaly?.candidates?.[i];
+  const mode = s2State.vegMode || "base";
+  const f = s2VegList(m, mode)[i];
   if (!f) return;
-  s2State.anomMonth = m.month;
+  s2State.anomKey = `${m.month}|${mode}`;
   s2State.anomSel = i;
+  const near = mode === "prev" ? "dprev" : "zanom";
+  const far = mode === "prev" ? "overview_dprev" : "overview_zanom";
   const pv = s2LL2px(s2State.data.view, f.lat, f.lon);
-  const inView = s2Inside(pv) && !!m.images?.zanom;
+  const inView = s2Inside(pv) && !!m.images?.[near];
   const p = inView ? pv : (s2LL2px(s2State.data.overview, f.lat, f.lon) || { x: f.ox, y: f.oy });
   s2RenderAnomaly(m);
-  s2OpenLightboxAt(inView ? "zanom" : "overview_zanom", p.x, p.y, inView ? 3 : 5);
+  s2OpenLightboxAt(inView ? near : far, p.x, p.y, inView ? 3 : 5);
 }
 
 function s2RenderBasis() {

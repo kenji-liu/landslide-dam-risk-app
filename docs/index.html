@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260928-s2v5" />
+    <link rel="stylesheet" href="./styles.css?v=20260928-s2v6" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -609,14 +609,21 @@
           <div class="s2-card-head">
             <div>
               <span class="section-kicker">Vegetation change</span>
-              <h3>植生變化偵測（與往年同月份比較）與崩積區復育</h3>
+              <h3>植生變化偵測與崩積區復育</h3>
             </div>
-            <span id="s2AnomBadge" class="s2-observation-count"></span>
+            <div class="s2-veg-nav">
+              <button type="button" class="outline" data-veg-step="-1" title="上一個月">‹ 上個月</button>
+              <strong id="s2VegMonth"></strong>
+              <button type="button" class="outline" data-veg-step="1" title="下一個月">下個月 ›</button>
+              <span id="s2AnomBadge" class="s2-observation-count"></span>
+            </div>
           </div>
+          <div id="s2VegMode" class="s2-seg" role="tablist" aria-label="比較方式"></div>
           <div id="s2AnomPlain" class="s2-plain"></div>
-          <p class="s2-overview-note"><b>怎麼看這張圖？</b>衛星每個月都會拍到整個集水區。系統把「本月植物的綠度」和「2019–2024 年同一個月份的平均」相比，排除季節差異後，<b class="t-red">紅色</b>代表植物比往年同期明顯變少（可能是新崩塌、土石堆積或河道沖刷），<b class="t-green">綠色</b>代表比往年多。拖曳滑桿可把變化圖疊在當月衛星照片上對照；點選右側清單或圖上圓圈，兩邊會互相標示，按「放大」可近看該位置。所有標記都是電腦初篩，須再以地形差分（DEM）與無人機（UAV）現地確認。</p>
+          <p class="s2-overview-note"><b>怎麼看這張圖？</b>衛星每個月都會拍到整個集水區。可切換兩種比較方式：「<b>與往年同月比</b>」是把本月植物綠度和 2019–2024 年同一個月份的平均相比（排除季節，看長期異常）；「<b>與上個月比</b>」是和前一個清晰月份相比（看這個月新發生的變化）。<b class="t-red">紅色</b>代表植物變少（可能是新崩塌、土石堆積或河道沖刷），<b class="t-green">綠色</b>代表變多。拖曳滑桿可把變化圖疊在當月衛星照片上對照；點選右側清單或圖上圓圈，兩邊會互相標示，按「放大」可近看該位置。所有標記都是電腦初篩，須再以地形差分（DEM）與無人機（UAV）現地確認。</p>
           <details class="s2-tech"><summary>技術說明（判釋準則）</summary>
             <p>以 2019–2024 年同月份 NDVI 平均與標準差為基準（去除季節性），z ≤ −2、ΔNDVI ≤ −0.20 且當月 NDVI &lt; 0.25（達裸露定義）、面積 ≥ 1 ha 的負異常區塊列為新生崩塌、土石堆積或河道擴寬候選；已扣除參考林當月偏移與 1.5 km 局部背景（排除霾與殘留薄雲），並依 DEM 坡度坡向與影像太陽角遮除地形陰影、排除雲緣 200 m 內區塊；同一位置首次偵測後改列「持續」，不重複通報。復育分區以 114/10–12 為事件後初期，比較近三個可用月份：NDVI ≥ 0.30 或 ΔNDVI ≥ 0.15 為自然復育、0.05–0.15 為緩慢復育、&lt; 0.05 建議人工植生評估。建議流程：NDVI 異常（面的篩選）→ DEM／DSM 差分（量的驗證）→ UAV 現地（點的確認）。</p>
+            <p>「與上個月比」：與前 3 個月內最近一個清晰月份（非品質疑慮、流域覆蓋 ≥ 40%）比較，扣除穩定林地兩月的整體綠度差；ΔNDVI ≤ −0.20 為明顯減少、≥ +0.20 為明顯增加。新增裸露區塊＝上月 NDVI ≥ 0.35、本月 &lt; 0.25、且扣除 1.5 km 局部背景後仍下降 ≥ 0.20、面積 ≥ 1 ha、距雲 200 m 以上；同一位置曾出現過者列為「反覆裸露」（多為耕作或季節性）。</p>
           </details>
           <div class="s2-overview-toolbar">
             <div id="s2AnomTabs" class="s2-metric-tabs" aria-label="切換圖層"></div>
@@ -645,7 +652,7 @@
             </div>
             <span id="s2MailStatus" class="s2-observation-count">載入中</span>
           </div>
-          <p class="s2-overview-note">每月自動更新後，系統會產生 PDF 月報（指標、影像、趨勢、新生水域清單）並寄給管理者與以下登記的信箱。新增或移除信箱需輸入權限密碼；密碼於伺服器端驗證，連續錯誤 5 次將暫停 30 分鐘。</p>
+          <p class="s2-overview-note">每月自動更新後，系統會產生 PDF 月報（指標、影像、趨勢、新生水域清單）並寄給管理者與以下登記的信箱。新增或移除信箱需輸入權限密碼；密碼於伺服器端驗證，連續錯誤 5 次將暫停 30 分鐘。<br>「立即寄送最新月報」可隨時補寄（需權限密碼，每日最多 5 次）：E-mail 欄<b>空白</b>＝寄給管理者＋全部名單；<b>填入 E-mail</b>＝只寄給該信箱。</p>
           <form id="s2MailForm" class="s2-mail-form" autocomplete="off">
             <label>E-mail<input id="s2MailEmail" type="email" placeholder="name@example.com" maxlength="254" /></label>
             <label>權限密碼<input id="s2MailPass" type="password" autocomplete="off" maxlength="64" /></label>
@@ -653,8 +660,10 @@
               <button type="submit" data-mail-action="subscribe">新增寄送</button>
               <button type="button" class="outline" data-mail-action="unsubscribe">移除</button>
               <button type="button" class="outline" data-mail-action="list">查看名單</button>
+              <button type="button" class="send" data-mail-action="send_now">立即寄送最新月報</button>
             </div>
           </form>
+          <p id="s2LatestReport" class="s2-small"></p>
           <div id="s2MailResult" class="s2-mail-result" aria-live="polite"></div>
         </article>
 
@@ -783,6 +792,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260928-s2v5"></script>
+    <script src="./app.js?v=20260928-s2v6"></script>
   </body>
 </html>

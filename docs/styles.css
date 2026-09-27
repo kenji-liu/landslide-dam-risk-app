@@ -2578,3 +2578,16 @@ body.s2-lb-open { overflow: hidden; }
 @media (max-width: 1180px) { .mon-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .s2-plain { grid-template-columns: 1fr; } .s2-blend input[type=range] { width: 110px; } }
 @media (prefers-reduced-motion: reduce) { .s2-pick.on .halo { animation: none; } }
+
+/* ---- v6：與上月比較、月份切換、立即寄送 ---- */
+.s2-veg-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.s2-veg-nav strong { min-width: 118px; text-align: center; font-size: 15px; color: #16303f; }
+.s2-veg-nav button { padding: 5px 12px; font-size: 13px; }
+.s2-veg-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+.s2-seg { display: inline-flex; margin: 0 0 12px; border: 1px solid #b8ccd4; border-radius: 999px; overflow: hidden; background: #fff; }
+.s2-seg button { border: 0; border-radius: 0; background: transparent; color: #2c4a5a; padding: 7px 18px; font-size: 14px; font-weight: 700; }
+.s2-seg button.active { background: #0f766e; color: #fff; }
+.s2-cmp-note { margin: 6px 0 0; }
+.s2-legend .ramp.dramp { background: linear-gradient(90deg, #7f1d1d, #dc2626, #fca5a5, #f5f5f4, #86efac, #16a34a, #14532d); }
+.s2-plain-tile strong .t-red, .s2-plain-tile strong .t-green { font-size: 24px; }
+.s2-mail-actions button.send { background: #b45309; border-color: #b45309; color: #fff; }
