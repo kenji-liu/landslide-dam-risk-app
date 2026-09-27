@@ -1,0 +1,32 @@
+{
+  "scope": "GLB 與展示 DSM 的座標、高程、拓撲、貼圖 UV 與檔案完整性檢查。非航測精度檢核。",
+  "models": [
+    {
+      "id": "matayan_20250930",
+      "vertices": 126410,
+      "triangles": 251012,
+      "maxMeshVsRasterErrorMetres": 0.0,
+      "topology": "PASS",
+      "uvGeoreferencing": "PASS",
+      "sha256": "PASS"
+    },
+    {
+      "id": "matayan_20250920",
+      "vertices": 189716,
+      "triangles": 377218,
+      "maxMeshVsRasterErrorMetres": 0.0,
+      "topology": "PASS",
+      "uvGeoreferencing": "PASS",
+      "sha256": "PASS"
+    },
+    {
+      "id": "matayan_cop30",
+      "vertices": 13608,
+      "triangles": 26750,
+      "maxMeshVsRasterErrorMetres": 0.0,
+      "topology": "PASS",
+      "uvGeoreferencing": "PASS",
+      "sha256": "PASS"
+    }
+  ]
+}

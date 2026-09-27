@@ -15,6 +15,17 @@
   --shadow: 0 12px 30px rgba(47, 77, 102, 0.09);
 }
 
+/* Measured DSM viewer: full-width working surface, with metadata below. */
+#model3d .model3d-layout { display: block; }
+#model3d .model3d-viewer { padding: 0; overflow: hidden; }
+.terrain-frame { width: 100%; height: 865px; display: block; border: 0; background: #e6eff3; }
+.terrain-open-link { display: inline-flex; align-items: center; padding: 9px 13px; color: #286b8e; border: 1px solid #c6dae7; border-radius: 8px; text-decoration: none; background: white; }
+.model3d-metadata-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.model3d-metadata-layout .model3d-summary { margin-top: 0; border: 0; background: transparent; padding: 0; }
+.model3d-form-card summary { cursor: pointer; font-weight: 700; margin-bottom: 12px; }
+.model3d-quality strong { color: #785d2a; }
+@media (max-width: 800px) { .model3d-metadata-layout { grid-template-columns: 1fr; } .terrain-frame { height: 940px; } }
+
 * { box-sizing: border-box; }
 
 body {

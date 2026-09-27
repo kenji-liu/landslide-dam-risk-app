@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260928-s2v6" />
+    <link rel="stylesheet" href="./styles.css?v=20260928-s2v6-terrain3d" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -231,61 +231,51 @@
       <section class="page" id="model3d">
         <div class="toolbar-card">
           <div>
-            <h2>3D 模型資料</h2>
-            <p>整合 UAV 三維建模、DSM/DEM、點雲與堰塞壩模型資訊，作為壩體幾何、庫容剖面與現地判釋的佐證資料。</p>
+            <h2>馬太鞍溪三維地形</h2>
+            <p>兩期 UAV 實測 DSM 與同日正射貼圖，可旋轉、縮放、切換日期及讀取地表高程。</p>
           </div>
-          <button id="apply3dModelToReport" type="button">納入報告摘要</button>
+          <div class="toolbar-actions"><a class="terrain-open-link" href="./terrain-viewer.html" target="_blank" rel="noopener">獨立開啟模型 ↗</a><button id="apply3dModelToReport" type="button">納入報告摘要</button></div>
         </div>
         <div class="model3d-layout">
           <article class="module-card model3d-viewer">
-            <div class="model3d-scene" aria-label="堰塞湖 3D 模型概念預覽">
-              <div class="model3d-grid"></div>
-              <div class="model3d-terrain">
-                <span class="model3d-lake"></span>
-                <span class="model3d-dam"></span>
-                <span class="model3d-slide"></span>
-                <span class="model3d-flow"></span>
-              </div>
-              <span class="model3d-label lake">蓄水區</span>
-              <span class="model3d-label dam">堰塞壩</span>
-              <span class="model3d-label slide">崩塌源區</span>
-            </div>
-            <div id="model3dSummary" class="model3d-summary"></div>
+            <iframe id="terrainFrame" class="terrain-frame" title="馬太鞍溪互動三維 DSM 模型" data-src="./terrain-viewer.html?embed=1" allow="fullscreen" allowfullscreen></iframe>
+            <noscript><a href="./terrain-viewer.html">開啟三維地形檢視器</a></noscript>
           </article>
-          <article class="module-card model3d-form-card">
-            <h3>模型資料登錄</h3>
+          <div class="model3d-metadata-layout"><article class="module-card"><div id="model3dSummary" class="model3d-summary"></div></article>
+          <details class="module-card model3d-form-card">
+            <summary>模型資料登錄（隨觀測資料切換）</summary>
             <div class="model3d-form">
-              <label>模型名稱<input id="model3dName" value="馬太鞍溪堰塞湖 UAV 三維模型" /></label>
+              <label>模型名稱<input id="model3dName" value="馬太鞍溪 UAV DSM・2025-09-30" /></label>
               <label>資料型態
                 <select id="model3dType">
                   <option>UAV 實景三維模型</option>
-                  <option>DSM/DEM 地形模型</option>
+                  <option selected>DSM/DEM 地形模型</option>
                   <option>點雲 LAS/LAZ</option>
                   <option>GLB/OBJ 網格模型</option>
                   <option>Cesium 3D Tiles</option>
                 </select>
               </label>
-              <label>模型檔案或雲端連結<input id="model3dLink" placeholder="例：assets/models/matayan_dam.glb 或雲端網址" /></label>
-              <label>座標系統<input id="model3dCrs" value="TWD97 / TM2 zone 121 或 WGS84" /></label>
-              <label>高程基準<input id="model3dDatum" value="正高/橢球高需註明，建議與 DEM、現地水尺一致" /></label>
-              <label>解析度 / 點雲密度<input id="model3dResolution" value="UAV 正射 5-10 cm；DSM 20-50 cm；點雲需註明 pts/m²" /></label>
-              <label>建模日期<input id="model3dDate" type="date" /></label>
+              <label>模型檔案或雲端連結<input id="model3dLink" value="assets/models/matayan_20250930.glb" /></label>
+              <label>座標系統<input id="model3dCrs" value="EPSG:3826 / TWD97 TM2 zone 121" /></label>
+              <label>高程基準<input id="model3dDatum" value="TWVD2001 正高（GeoTIFF 標示）" /></label>
+              <label>解析度 / 點雲密度<input id="model3dResolution" value="來源 DSM 0.1 m；展示網格 5 m；尚無獨立高程精度檢核" /></label>
+              <label>資料日期 / 產品年代<input id="model3dDate" type="text" value="2025-09-30" /></label>
               <label>主要用途
                 <select id="model3dPurpose">
                   <option>壩體幾何量測與剖面校核</option>
                   <option>崩塌體積與堆積體差分</option>
                   <option>庫容曲線與水位情境</option>
-                  <option>通報簡報與現地協調展示</option>
+                  <option selected>通報簡報與現地協調展示</option>
                 </select>
               </label>
             </div>
-          </article>
+          </details></div>
         </div>
         <section class="criteria-grid model3d-notes">
           <article><strong>可納入資料</strong><p>GLB/OBJ 模型、LAS/LAZ 點雲、DSM/DEM、正射影像、剖面線與水位面；大型資料建議放雲端後以連結管理。</p></article>
           <article><strong>專家判釋重點</strong><p>確認壩頂溢流點、壩體左右岸接合、崩塌堆積厚度、可能滲流出水與下游沖刷通道。</p></article>
           <article><strong>品質檢核</strong><p>模型需註明拍攝日期、座標系統、高程基準、解析度、控制點精度與遮蔽區，避免與風險參數混用。</p></article>
-          <article><strong>與平台串接</strong><p>3D 模型可支援 HDmin、WD、LDTop、VD、VL、庫容曲線與通報展示，後續可升級為真正 GLB/3D Tiles 檢視器。</p></article>
+          <article><strong>建模與使用範圍</strong><p>既有 DSM 網格化與正射貼圖；未重新由衛星影像反演高程。兩期尚未完成穩定地表配準與精度評估，模型切換僅供視覺比較。</p></article>
         </section>
       </section>
 
@@ -792,6 +782,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260928-s2v6"></script>
+    <script src="./app.js?v=20260928-s2v6-terrain3d"></script>
   </body>
 </html>

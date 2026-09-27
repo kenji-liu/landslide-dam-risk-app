@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "builtAt": "2026-09-27T12:11:32.130228+00:00",
+  "defaultModel": "matayan_20250930",
+  "origin": [
+    281000.0,
+    2621500.0,
+    600.0
+  ],
+  "models": [
+    {
+      "id": "matayan_20250930",
+      "name": "馬太鞍溪 UAV DSM・2025-09-30",
+      "date": "2025-09-30",
+      "dateBasis": "來源檔名標示的航測日期",
+      "kind": "uav",
+      "glb": "matayan_20250930.glb",
+      "raster": "matayan_20250930_dsm.tif",
+      "texture": "matayan_20250930_texture.jpg",
+      "preview": "matayan_20250930_preview.jpg",
+      "crs": "EPSG:3826 / TWD97 TM2 zone 121",
+      "datum": "TWVD2001 正高（GeoTIFF 標示）",
+      "sourceInfo": {
+        "file": "20250930馬太鞍溪堰塞湖_TWD972020-dsm.tiff",
+        "size": [
+          26087,
+          21387
+        ],
+        "pixelSize": [
+          0.1,
+          0.1
+        ],
+        "projectionWkt": "COMPD_CS[\"TWD97 / TM2 zone 121 + TWVD 2001 height\",PROJCS[\"TWD97 / TM2 zone 121\",GEOGCS[\"TWD97\",DATUM[\"Taiwan_Datum_1997\",SPHEROID[\"GRS 1980\",6378137,298.257222101,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"1026\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"3824\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",121],PARAMETER[\"scale_factor\",0.9999],PARAMETER[\"false_easting\",250000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"3826\"]],VERT_CS[\"TWVD 2001 height\",VERT_DATUM[\"Taiwan Vertical Datum 2001\",2005,AUTHORITY[\"EPSG\",\"1224\"]],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Gravity-related height\",UP],AUTHORITY[\"EPSG\",\"8904\"]]]",
+        "software": "Pix4Dmatic 1.83.0",
+        "fileCreationDate": "2025:10:01 04:19:04"
+      },
+      "orthoInfo": {
+        "file": "20250930馬太鞍溪堰塞湖_TWD972020-orthomosaic.tiff",
+        "pixelSize": [
+          0.1,
+          0.1
+        ]
+      },
+      "sourceResolution": 0.1,
+      "meshResolution": 5,
+      "textureResolutionApprox": 1.02,
+      "bounds": [
+        279745.0,
+        2620255.0,
+        282355.0,
+        2622395.0
+      ],
+      "boundsWgs84": [
+        121.29169658083485,
+        23.68572715603253,
+        121.317244752066,
+        23.70510127391516
+      ],
+      "heightRange": [
+        700.7841796875,
+        1464.9127197265625
+      ],
+      "validAreaHa": 316.02,
+      "validPercent": 56.58,
+      "gridSize": [
+        522,
+        428
+      ],
+      "vertices": 126410,
+      "triangles": 251012,
+      "bytes": 7934628,
+      "sha256": "2d16d7b6be1faef3b5e8eb7a0c0dddf28632e0c43287016ec00ace24fea5a3a2",
+      "limits": "5 m 為展示網格間距，非高程精度。未重新進行控制點檢核；水面、植被與邊界可能有重建誤差。兩期覆蓋不同，未作差分或體積計算。",
+      "validation": "模型結構與座標檢查完成；尚無獨立高程精度檢核"
+    },
+    {
+      "id": "matayan_20250920",
+      "name": "馬太鞍溪 UAV DSM・2025-09-20",
+      "date": "2025-09-20",
+      "dateBasis": "來源檔名標示的航測日期",
+      "kind": "uav",
+      "glb": "matayan_20250920.glb",
+      "raster": "matayan_20250920_dsm.tif",
+      "texture": "matayan_20250920_texture.jpg",
+      "preview": "matayan_20250920_preview.jpg",
+      "crs": "EPSG:3826 / TWD97 TM2 zone 121",
+      "datum": "TWVD2001 正高（GeoTIFF 標示）",
+      "sourceInfo": {
+        "file": "20250920馬太鞍溪堰塞湖_TWD972020-dsm.tiff",
+        "size": [
+          25231,
+          31604
+        ],
+        "pixelSize": [
+          0.1,
+          0.1
+        ],
+        "projectionWkt": "COMPD_CS[\"TWD97 / TM2 zone 121 + TWVD 2001 height\",PROJCS[\"TWD97 / TM2 zone 121\",GEOGCS[\"TWD97\",DATUM[\"Taiwan_Datum_1997\",SPHEROID[\"GRS 1980\",6378137,298.257222101,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"1026\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"3824\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",121],PARAMETER[\"scale_factor\",0.9999],PARAMETER[\"false_easting\",250000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"3826\"]],VERT_CS[\"TWVD 2001 height\",VERT_DATUM[\"Taiwan Vertical Datum 2001\",2005,AUTHORITY[\"EPSG\",\"1224\"]],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Gravity-related height\",UP],AUTHORITY[\"EPSG\",\"8904\"]]]",
+        "software": "Pix4Dmatic 1.82.0",
+        "fileCreationDate": "2025:09:21 02:55:14"
+      },
+      "orthoInfo": {
+        "file": "20250920馬太鞍溪堰塞湖_TWD972020-orthomosaic.tiff",
+        "pixelSize": [
+          0.1,
+          0.1
+        ]
+      },
+      "sourceResolution": 0.1,
+      "meshResolution": 5,
+      "textureResolutionApprox": 1.23,
+      "bounds": [
+        279790.0,
+        2620170.0,
+        282315.0,
+        2623330.0
+      ],
+      "boundsWgs84": [
+        121.29215667201665,
+        23.684960425252388,
+        121.31685070033106,
+        23.71354330553541
+      ],
+      "heightRange": [
+        649.34521484375,
+        1491.591552734375
+      ],
+      "validAreaHa": 474.29,
+      "validPercent": 59.44,
+      "gridSize": [
+        505,
+        632
+      ],
+      "vertices": 189716,
+      "triangles": 377218,
+      "bytes": 12291312,
+      "sha256": "5d395fc093d8c3cde2ea109ab2b837d5aed82a0add3bc69a885bf2108a7e4423",
+      "limits": "5 m 為展示網格間距，非高程精度。未重新進行控制點檢核；水面、植被與邊界可能有重建誤差。兩期覆蓋不同，未作差分或體積計算。",
+      "validation": "模型結構與座標檢查完成；尚無獨立高程精度檢核"
+    },
+    {
+      "id": "matayan_cop30",
+      "name": "Copernicus GLO-30 衛星 DSM 參考地形",
+      "date": "2011–2015",
+      "dateBasis": "產品涵蓋年代",
+      "kind": "satellite",
+      "glb": "matayan_cop30.glb",
+      "raster": "matayan_cop30_dsm.tif",
+      "texture": "matayan_cop30_texture.jpg",
+      "preview": "matayan_cop30_preview.jpg",
+      "crs": "EPSG:3826 / TWD97 TM2 zone 121",
+      "datum": "EGM2008 正高（尚未轉換為 TWVD2001）",
+      "sourceInfo": {
+        "file": "copernicus_n23e121.tif",
+        "size": [
+          3600,
+          3600
+        ],
+        "pixelSize": [
+          0.0002777777777777778,
+          0.0002777777777777778
+        ],
+        "projectionWkt": "GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AXIS[\"Latitude\",NORTH],AXIS[\"Longitude\",EAST],AUTHORITY[\"EPSG\",\"4326\"]]",
+        "software": null,
+        "fileCreationDate": null
+      },
+      "orthoInfo": null,
+      "sourceResolution": 30,
+      "meshResolution": 30,
+      "textureResolutionApprox": null,
+      "bounds": [
+        279420.0,
+        2619870.0,
+        282660.0,
+        2623650.0
+      ],
+      "boundsWgs84": [
+        121.28853439794483,
+        23.682244525537183,
+        121.3202268033867,
+        23.716439649532717
+      ],
+      "heightRange": [
+        619.6717529296875,
+        2138.69775390625
+      ],
+      "validAreaHa": 1224.72,
+      "validPercent": 100.0,
+      "gridSize": [
+        108,
+        126
+      ],
+      "vertices": 13608,
+      "triangles": 26750,
+      "bytes": 769508,
+      "sha256": "f176359851f4164a9e889e3d9a591a120c42b694742f2e14865c819d33f52ffa",
+      "limits": "2011–2015 年代的既有全球 DSM，無法代表 2025 年堰塞壩現況；與 UAV 的垂直基準不同，僅供背景判讀。",
+      "validation": "模型結構與座標檢查完成；尚無獨立高程精度檢核"
+    }
+  ],
+  "method": "既有 DSM 網格化 + 同日正射影像貼圖。保留無資料區，不由 RGB 或 NISAR 重新反演高程。",
+  "sources": [
+    {
+      "name": "使用者提供的 UAV DSM／正射影像（Pix4Dmatic）"
+    },
+    {
+      "name": "Copernicus DEM GLO-30",
+      "url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "attribution": "Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved."
+    }
+  ]
+}

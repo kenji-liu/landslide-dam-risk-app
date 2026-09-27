@@ -50,6 +50,48 @@ let latest = {};
 let storageState = null;
 let model3dState = null;
 let model3dReportEnabled = true;
+let terrainModelMetadata = null;
+let terrainManifestPromise = null;
+
+function terrainManifest() {
+  if (!terrainManifestPromise) terrainManifestPromise = fetch('./assets/models/manifest.json').then(r => {
+    if (!r.ok) throw new Error('模型清單讀取失敗');
+    return r.json();
+  }).catch(error => { terrainManifestPromise = null; throw error; });
+  return terrainManifestPromise;
+}
+
+async function selectTerrainMetadata(id) {
+  const manifest = await terrainManifest();
+  const item = manifest.models.find(model => model.id === id);
+  if (!item) return;
+  terrainModelMetadata = item;
+  const values = {
+    model3dName: item.name, model3dType: 'DSM/DEM 地形模型',
+    model3dLink: `assets/models/${item.glb}`, model3dCrs: item.crs,
+    model3dDatum: item.datum, model3dDate: item.date,
+    model3dResolution: `來源 DSM ${item.sourceResolution} m；展示網格 ${item.meshResolution} m；尚無獨立高程精度檢核`,
+    model3dPurpose: '通報簡報與現地協調展示'
+  };
+  Object.entries(values).forEach(([id, value]) => { document.getElementById(id).value = value; });
+  renderModel3dAnalysis();
+  renderReport();
+}
+
+window.addEventListener('message', event => {
+  const frame = document.getElementById('terrainFrame');
+  if (event.origin !== location.origin || event.source !== frame?.contentWindow) return;
+  if (event.data?.type === 'terrain-viewer-size' && Number.isFinite(event.data.height)) {
+    frame.style.height = `${Math.max(500, Math.min(2200, event.data.height + 2))}px`;
+    return;
+  }
+  if (event.data?.type !== 'terrain-model-selected') return;
+  selectTerrainMetadata(event.data.id).catch(error => console.warn(error.message));
+});
+
+function escapeModelText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+}
 
 const matayanLocation = {
   name: "馬太鞍溪堰塞湖",
@@ -507,16 +549,16 @@ function evaluateModel3dQuality(model) {
     ["座標系統", model.crs],
     ["高程基準", model.datum],
     ["解析度/點雲密度", model.resolution],
-    ["建模日期", model.date],
+    ["資料日期 / 產品年代", model.date],
     ["主要用途", model.purpose]
   ];
   const filled = checks.filter(([, value]) => value).length;
   const score = Math.round(filled / checks.length * 100);
   const missing = checks.filter(([, value]) => !value).map(([label]) => label);
-  let level = "可供展示";
+  let level = "登錄欄位待補";
   let cls = "warn";
-  if (score >= 88) {
-    level = "可供專家判釋";
+  if (score === 100) {
+    level = "登錄欄位完整";
     cls = "ok";
   } else if (score < 55) {
     level = "資料待補";
@@ -529,27 +571,30 @@ function renderModel3dAnalysis() {
   if (!model3dSummary) return;
   const model = getModel3dInputs();
   const quality = evaluateModel3dQuality(model);
-  model3dState = { ...model, ...quality };
+  const source = terrainModelMetadata && model.link === `assets/models/${terrainModelMetadata.glb}` ? terrainModelMetadata : null;
+  model3dState = { ...model, ...quality, evidenceLimit: source?.limits || '登錄完整度不代表模型精度，尚需獨立高程檢核。' };
+  const safe = Object.fromEntries(Object.entries(model).map(([key, value]) => [key, escapeModelText(value)]));
 
   const linkText = model.link
-    ? `<span class="model3d-link">${model.link}</span>`
+    ? `<span class="model3d-link">${safe.link}</span>`
     : `<span class="model3d-link empty">尚未填入模型檔案或雲端連結</span>`;
   const missingText = quality.missing.length
     ? `建議補齊：${quality.missing.slice(0, 4).join("、")}${quality.missing.length > 4 ? "等" : ""}`
-    : "模型中繼資料完整，可作為壩體幾何與庫容剖面佐證。";
+    : "登錄欄位已填齊；此比例不代表模型高程精度或工程適用性。";
 
   model3dSummary.innerHTML = `
     <div class="model3d-summary-head">
       <span class="tag ${quality.cls}">${quality.level}</span>
-      <strong>${quality.score}%</strong>
+      <strong>登錄完整度 ${quality.score}%</strong>
     </div>
-    <h3>${model.name || "未命名 3D 模型"}</h3>
-    <p><b>資料型態：</b>${model.type || "待填"}；<b>用途：</b>${model.purpose || "待填"}</p>
-    <p><b>座標/高程：</b>${model.crs || "待填"}｜${model.datum || "待填"}</p>
-    <p><b>解析度：</b>${model.resolution || "待填"}</p>
-    <p><b>建模日期：</b>${model.date || "待填"}</p>
+    <h3>${safe.name || "未命名 3D 模型"}</h3>
+    <p><b>資料型態：</b>${safe.type || "待填"}；<b>用途：</b>${safe.purpose || "待填"}</p>
+    <p><b>座標/高程：</b>${safe.crs || "待填"}｜${safe.datum || "待填"}</p>
+    <p><b>解析度：</b>${safe.resolution || "待填"}</p>
+    <p><b>資料日期 / 年代：</b>${safe.date || "待填"}</p>
     ${linkText}
     <p class="model3d-quality">${missingText}</p>
+    <p class="model3d-quality"><strong>使用限制：</strong>${escapeModelText(model3dState.evidenceLimit)}</p>
   `;
 }
 
@@ -1154,7 +1199,7 @@ function renderReport() {
     ? `\n補充、庫容剖面情境\n目前情境水位約 ${fmt(storageState.level, 1)} m，估算庫容約 ${fmt(storageState.storage10k, 1)} 萬 m³，距溢流口約 ${fmt(storageState.freeboard, 1)} m；可作為 Vw 與溢流警戒情境之校核。`
     : "";
   const modelLine = model3dReportEnabled && model3dState
-    ? `\n補充、3D 模型資料\n已登錄「${model3dState.name || "未命名 3D 模型"}」，資料型態為 ${model3dState.type || "待填"}，品質檢核為「${model3dState.level}」(${model3dState.score}%)；可用於 ${model3dState.purpose || "壩體幾何、庫容剖面與通報展示"}。模型資料需持續校核座標系統、高程基準、解析度與拍攝日期。`
+    ? `\n補充、3D 模型資料\n已登錄「${model3dState.name || "未命名 3D 模型"}」，資料型態為 ${model3dState.type || "待填"}，登錄完整度 ${model3dState.score}%（不代表高程精度）；用途為 ${model3dState.purpose || "地形展示"}。資料日期／年代：${model3dState.date || "待填"}；高程基準：${model3dState.datum || "待填"}。${model3dState.evidenceLimit}`
     : "";
   reportText.value = `【${latest.caseName}｜堰塞湖緊急調查與風險評估摘要】
 
@@ -1196,7 +1241,7 @@ function keyMetricLines() {
     lines.push(`庫容情境：水位 ${fmt(storageState.level, 1)} m、庫容 ${fmt(storageState.storage10k, 1)} 萬 m³、距溢流口 ${fmt(storageState.freeboard, 1)} m`);
   }
   if (model3dState) {
-    lines.push(`3D 模型：${model3dState.name || "未命名"}，${model3dState.type || "資料型態待填"}，品質 ${model3dState.score}% (${model3dState.level})`);
+    lines.push(`3D 模型：${model3dState.name || "未命名"}，${model3dState.type || "資料型態待填"}，登錄完整度 ${model3dState.score}%（不代表高程精度）`);
   }
   return lines;
 }
@@ -1290,6 +1335,10 @@ function showPage(pageId) {
   document.querySelectorAll(".page").forEach((page) => page.classList.toggle("active", page.id === pageId));
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.page === pageId));
   document.querySelector("#pageTitle").textContent = pageTitles[pageId] || "案件儀表板";
+  const terrainFrame = document.querySelector('#terrainFrame');
+  if (pageId === 'model3d' && terrainFrame && !terrainFrame.getAttribute('src')) terrainFrame.src = terrainFrame.dataset.src;
+  terrainFrame?.contentWindow?.postMessage({type: 'terrain-visibility', active: pageId === 'model3d'}, location.origin);
+  if (pageTitles[pageId] && location.hash !== `#${pageId}`) history.replaceState(null, '', `#${pageId}`);
   if (pageId === "gis" && spatialState.map) {
     setTimeout(() => spatialState.map.invalidateSize(), 120);
   }
@@ -1299,7 +1348,8 @@ function exportData() {
   const data = {
     exportedAt: new Date().toISOString(),
     inputs: Object.fromEntries([...form.elements].filter((el) => el.name).map((el) => [el.name, el.value])),
-    assessment: latest
+    assessment: latest,
+    terrainModel: model3dState
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
@@ -3664,3 +3714,8 @@ initSpatialMap();
 compute();
 renderMonitor();
 initSentinel2();
+if (pageTitles[location.hash.slice(1)]) showPage(location.hash.slice(1));
+window.addEventListener('hashchange', () => {
+  if (pageTitles[location.hash.slice(1)]) showPage(location.hash.slice(1));
+});
+selectTerrainMetadata('matayan_20250930').catch(error => console.warn(error.message));

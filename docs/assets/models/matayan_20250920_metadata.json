@@ -1,0 +1,65 @@
+{
+  "id": "matayan_20250920",
+  "name": "馬太鞍溪 UAV DSM・2025-09-20",
+  "date": "2025-09-20",
+  "dateBasis": "來源檔名標示的航測日期",
+  "kind": "uav",
+  "glb": "matayan_20250920.glb",
+  "raster": "matayan_20250920_dsm.tif",
+  "texture": "matayan_20250920_texture.jpg",
+  "preview": "matayan_20250920_preview.jpg",
+  "crs": "EPSG:3826 / TWD97 TM2 zone 121",
+  "datum": "TWVD2001 正高（GeoTIFF 標示）",
+  "sourceInfo": {
+    "file": "20250920馬太鞍溪堰塞湖_TWD972020-dsm.tiff",
+    "size": [
+      25231,
+      31604
+    ],
+    "pixelSize": [
+      0.1,
+      0.1
+    ],
+    "projectionWkt": "COMPD_CS[\"TWD97 / TM2 zone 121 + TWVD 2001 height\",PROJCS[\"TWD97 / TM2 zone 121\",GEOGCS[\"TWD97\",DATUM[\"Taiwan_Datum_1997\",SPHEROID[\"GRS 1980\",6378137,298.257222101,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"1026\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"3824\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",121],PARAMETER[\"scale_factor\",0.9999],PARAMETER[\"false_easting\",250000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"3826\"]],VERT_CS[\"TWVD 2001 height\",VERT_DATUM[\"Taiwan Vertical Datum 2001\",2005,AUTHORITY[\"EPSG\",\"1224\"]],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Gravity-related height\",UP],AUTHORITY[\"EPSG\",\"8904\"]]]",
+    "software": "Pix4Dmatic 1.82.0",
+    "fileCreationDate": "2025:09:21 02:55:14"
+  },
+  "orthoInfo": {
+    "file": "20250920馬太鞍溪堰塞湖_TWD972020-orthomosaic.tiff",
+    "pixelSize": [
+      0.1,
+      0.1
+    ]
+  },
+  "sourceResolution": 0.1,
+  "meshResolution": 5,
+  "textureResolutionApprox": 1.23,
+  "bounds": [
+    279790.0,
+    2620170.0,
+    282315.0,
+    2623330.0
+  ],
+  "boundsWgs84": [
+    121.29215667201665,
+    23.684960425252388,
+    121.31685070033106,
+    23.71354330553541
+  ],
+  "heightRange": [
+    649.34521484375,
+    1491.591552734375
+  ],
+  "validAreaHa": 474.29,
+  "validPercent": 59.44,
+  "gridSize": [
+    505,
+    632
+  ],
+  "vertices": 189716,
+  "triangles": 377218,
+  "bytes": 12291312,
+  "sha256": "5d395fc093d8c3cde2ea109ab2b837d5aed82a0add3bc69a885bf2108a7e4423",
+  "limits": "5 m 為展示網格間距，非高程精度。未重新進行控制點檢核；水面、植被與邊界可能有重建誤差。兩期覆蓋不同，未作差分或體積計算。",
+  "validation": "模型結構與座標檢查完成；尚無獨立高程精度檢核"
+}

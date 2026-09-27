@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>馬太鞍溪三維地形｜DSM 實測模型</title>
+  <link rel="stylesheet" href="./terrain-viewer.css?v=20260927-2" />
+  <script type="importmap">{"imports":{"three":"./assets/vendor/three/build/three.module.min.js"}}</script>
+</head>
+<body>
+  <main class="terrain-app">
+    <header class="viewer-header">
+      <div><span class="eyebrow">馬太鞍溪 · 地表模型</span><h1>三維地形檢視</h1></div>
+      <div class="dataset-control"><label for="dataset">觀測資料</label><select id="dataset" disabled><option>讀取模型清單…</option></select></div>
+      <a class="back-link" href="./index.html#model3d" target="_top">返回評估平台 ↗</a>
+    </header>
+    <section class="viewer-tools" aria-label="三維模型控制">
+      <div class="segmented" role="group" aria-label="模型顯示方式">
+        <button id="textureMode" type="button" class="selected" aria-pressed="true">正射貼圖</button>
+        <button id="heightMode" type="button" aria-pressed="false">高程設色</button>
+      </div>
+      <label class="exaggeration">垂直倍率 <select id="exaggeration"><option value="1">1× 原比例</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+      <label class="check"><input id="wireframe" type="checkbox" /> 網格</label>
+      <div class="view-buttons" role="group" aria-label="視角預設"><button id="viewOblique" type="button">斜視全景</button><button id="viewTop" type="button">俯視</button></div>
+      <button id="fullscreen" type="button" class="icon-button">全螢幕 ⛶</button>
+    </section>
+    <section id="viewport" class="viewport" aria-label="可互動的三維地形">
+      <div id="canvasHost" class="canvas-host"></div>
+      <div class="viewport-caption"><span id="sourceBadge" class="source-badge">DSM 地形模型</span><strong id="sceneDate">載入中</strong><span id="sceneSpacing"></span></div>
+      <div class="compass" aria-label="指北針"><span id="northArrow">↑</span><b>N</b></div>
+      <div class="camera-buttons" role="group" aria-label="調整三維視角">
+        <button id="zoomIn" type="button" aria-label="放大">＋</button><button id="zoomOut" type="button" aria-label="縮小">−</button>
+        <button id="rotateLeft" type="button" aria-label="向左旋轉">↶</button><button id="rotateRight" type="button" aria-label="向右旋轉">↷</button>
+      </div>
+      <div id="loading" class="loading-panel" role="status" aria-live="polite"><span class="spinner"></span><strong id="loadingText">準備三維模型…</strong><progress id="progress" max="100" value="0"></progress><div class="loading-actions"><button id="retry" type="button" hidden>重新載入</button><button id="dismissError" type="button" hidden>關閉提示</button></div></div>
+      <div id="heightLegend" class="height-legend" hidden><span>地表高程 m</span><div class="gradient"></div><div class="legend-ticks"><span id="legendLow"></span><span id="legendHigh"></span></div></div>
+      <div class="viewport-bottom"><span class="interaction-help">拖曳旋轉 · 右鍵平移 · 滾輪縮放 · 點選讀取高程</span><span id="readout" class="readout" role="status">點選模型查看地表高程</span></div>
+    </section>
+    <section class="model-info" aria-label="模型來源與品質">
+      <div class="stats-row"><div><span>來源格網</span><strong id="sourceResolution">—</strong></div><div><span>展示網格</span><strong id="meshResolution">—</strong></div><div><span>有效覆蓋</span><strong id="validArea">—</strong></div><div><span>高程範圍</span><strong id="heightRange">—</strong></div><div><span>網格面數</span><strong id="faceCount">—</strong></div></div>
+      <p class="source-line" id="sourceLine">來源資料載入中</p>
+      <p class="limits" id="limits">DSM 表示地表面；包含植被等地物。模型空缺保留為無資料。</p>
+      <div class="download-row"><a id="downloadGlb" class="download primary" download>下載 GLB 模型</a><a id="downloadDsm" class="download" download>下載展示 DSM</a><a id="downloadMetadata" class="download" download>來源與中繼資料</a><button id="saveImage" type="button" disabled>匯出目前視角</button><span id="downloadSize"></span></div>
+      <details class="method"><summary>建模方法與資料來源</summary><p>既有 DSM → 保留高程基準並降採樣 → 排除 NoData 三角面 → 同日正射影像貼圖 → GLB。垂直倍率只改變顯示，點選讀值與下載模型均保留原高程。此為地表的 2.5D 網格，不包含岩壁背面或懸垂面的完整三維幾何。</p><p>航測日期依來源檔名標示；GeoTIFF 中繼資料確認 TWD97 / TM2 zone 121 與 TWVD2001 高程基準。原始格網間距不等於量測精度，尚無獨立檢核點精度報告。</p><p>衛星參考模型：<a href="https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM" target="_blank" rel="noopener">Copernicus DEM GLO-30</a>，2011–2015 年代、EGM2008 正高，僅供區域背景。</p><p class="attribution">Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.</p></details>
+    </section>
+  </main>
+  <noscript>請啟用 JavaScript 以查看三維模型。<a href="./assets/models/matayan_20250930.glb">下載 GLB 模型</a></noscript>
+  <script type="module" src="./terrain-viewer.js?v=20260927-2"></script>
+</body>
+</html>

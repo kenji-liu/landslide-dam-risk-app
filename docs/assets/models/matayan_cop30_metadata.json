@@ -1,0 +1,59 @@
+{
+  "id": "matayan_cop30",
+  "name": "Copernicus GLO-30 衛星 DSM 參考地形",
+  "date": "2011–2015",
+  "dateBasis": "產品涵蓋年代",
+  "kind": "satellite",
+  "glb": "matayan_cop30.glb",
+  "raster": "matayan_cop30_dsm.tif",
+  "texture": "matayan_cop30_texture.jpg",
+  "preview": "matayan_cop30_preview.jpg",
+  "crs": "EPSG:3826 / TWD97 TM2 zone 121",
+  "datum": "EGM2008 正高（尚未轉換為 TWVD2001）",
+  "sourceInfo": {
+    "file": "copernicus_n23e121.tif",
+    "size": [
+      3600,
+      3600
+    ],
+    "pixelSize": [
+      0.0002777777777777778,
+      0.0002777777777777778
+    ],
+    "projectionWkt": "GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AXIS[\"Latitude\",NORTH],AXIS[\"Longitude\",EAST],AUTHORITY[\"EPSG\",\"4326\"]]",
+    "software": null,
+    "fileCreationDate": null
+  },
+  "orthoInfo": null,
+  "sourceResolution": 30,
+  "meshResolution": 30,
+  "textureResolutionApprox": null,
+  "bounds": [
+    279420.0,
+    2619870.0,
+    282660.0,
+    2623650.0
+  ],
+  "boundsWgs84": [
+    121.28853439794483,
+    23.682244525537183,
+    121.3202268033867,
+    23.716439649532717
+  ],
+  "heightRange": [
+    619.6717529296875,
+    2138.69775390625
+  ],
+  "validAreaHa": 1224.72,
+  "validPercent": 100.0,
+  "gridSize": [
+    108,
+    126
+  ],
+  "vertices": 13608,
+  "triangles": 26750,
+  "bytes": 769508,
+  "sha256": "f176359851f4164a9e889e3d9a591a120c42b694742f2e14865c819d33f52ffa",
+  "limits": "2011–2015 年代的既有全球 DSM，無法代表 2025 年堰塞壩現況；與 UAV 的垂直基準不同，僅供背景判讀。",
+  "validation": "模型結構與座標檢查完成；尚無獨立高程精度檢核"
+}
