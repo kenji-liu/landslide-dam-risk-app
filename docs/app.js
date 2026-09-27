@@ -2514,18 +2514,22 @@ function s2DetectionTimeline(index) {
   const cells = months.map((m, i) => {
     const cls = (m.new_water || []).map((f) => f.class);
     let tone = "none"; let tip = "無影像";
-    if (m.images && !m.water_scanned) { tone = "cloud"; tip = "雲遮過多未掃描"; }
-    else if (m.water_scanned) {
-      tone = "clear"; tip = "未見需關注水體";
-      if (cls.includes("known_lake")) { tone = "lake"; tip = "既有堰塞湖區水域"; }
-      if (cls.includes("new_candidate")) { tone = "new"; tip = "新生水域候選"; }
+    const w = m.water_area_ha;
+    const wTxt = w == null ? "" : `；壩區水域${m.water_area_is_minimum ? "≥" : ""}${w.toFixed(1)} ha`;
+    const lakeWater = cls.includes("known_lake") || (w != null && w >= 10);   // 事件前壩區水域多在5 ha以下
+    if (m.images && !m.water_scanned) {
+      tone = lakeWater ? "lake" : "cloud"; tip = `雲遮過多，未做全流域掃描${wTxt}`;
+    } else if (m.water_scanned) {
+      tone = lakeWater ? "lake" : "clear";
+      tip = `${lakeWater ? "既有堰塞湖區有水" : "未見新生水域"}${wTxt}`;
+      if (cls.includes("new_candidate")) { tone = "new"; tip = `新生水域候選${wTxt}`; }
     }
     return `<button type="button" class="s2-dt-cell ${tone}${i === index ? " selected" : ""}" data-s2-index="${i}" title="${m.roc_month} ${tip}"></button>`;
   }).join("");
   const axis = months.map((m, i) => (m.month.endsWith("-01")
     ? `<span style="left:${((i + 0.5) / months.length * 100).toFixed(2)}%">${Number(m.month.slice(0, 4)) - 1911}</span>` : "")).join("");
   return `<div class="s2-dt-strip">${cells}</div><div class="s2-dt-axis">${axis}<em>民國年</em></div>
-    <div class="s2-dt-legend"><span><i class="new"></i>新生水域候選</span><span><i class="lake"></i>既有湖區有水</span><span><i class="clear"></i>已掃描無異常</span><span><i class="cloud"></i>雲遮未掃描</span><span><i class="none"></i>無影像</span></div>`;
+    <div class="s2-dt-legend"><span><i class="new"></i>新生水域候選</span><span><i class="lake"></i>既有湖區有水</span><span><i class="clear"></i>未見新生水域</span><span><i class="cloud"></i>雲遮未掃描</span><span><i class="none"></i>無影像</span></div>`;
 }
 
 function s2RenderOverview(m, index) {
