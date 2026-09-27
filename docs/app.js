@@ -3167,7 +3167,8 @@ const s2AnomClass = {
   channel: { label: "主河道沖刷／擴寬", color: "#64748b", tone: "nw-down" },
   transient: { label: "單月雜訊（不列警示）", color: "#94a3b8", tone: "nw-down" },
   new_bare: { label: "新增裸露（上月有植物）", color: "#dc2626", tone: "nw-new" },
-  recurring: { label: "反覆裸露（可能耕作／季節性）", color: "#94a3b8", tone: "nw-down" }
+  recurring: { label: "反覆裸露（可能耕作／季節性）", color: "#94a3b8", tone: "nw-down" },
+  uncertain: { label: "可能變裸露（受霾，待確認）", color: "#f59e0b", tone: "nw-slide" }
 };
 
 function s2Esc(v) {
@@ -3212,11 +3213,13 @@ function s2RenderAnomaly(m) {
 
   const mo = m.mom;
   const emptyMsg = mode === "prev"
-    ? (mo?.skipped ? `無法與上月比較：${s2Esc(mo.skipped)}。` : "本月無與上月比較的資料。")
+    ? (mo?.skipped ? `無法與上月比較：${s2Esc(mo.skipped)}。` : "本月沒有可用的衛星影像（整月雲遮或無拍攝），無法與上月比較。")
     : "本月無植生變化資料（無影像或整月雲遮）。";
   document.querySelector("#s2AnomFigure").innerHTML = useLayer
     ? `<div class="s2-zoomable" data-s2-zoom="${useLayer}" tabindex="0" role="button" aria-label="放大">${s2FigureSvg(useLayer, m, { stamp: true })}</div>`
-      + (mode === "prev" && mo?.prev ? `<p class="s2-small s2-cmp-note">比較：${s2Esc(m.roc_month)} ↔ ${s2Esc(mo.prev_roc || s2RocOf(mo.prev))}${mo.gap > 1 ? `（中間 ${mo.gap - 1} 個月雲遮或品質不足，改與最近一個清晰月份比較）` : ""}</p>` : "")
+      + (mode === "prev" && mo?.prev && !mo.skipped ? `<p class="s2-small s2-cmp-note">比較：${s2Esc(m.roc_month)} ↔ ${s2Esc(mo.prev_roc || s2RocOf(mo.prev))}${mo.gap > 1 ? `（中間 ${mo.gap - 1} 個月雲遮或品質不足，改與最近一個清晰月份比較）` : ""}${mo.quality_note ? `；${s2Esc(mo.quality_note)}` : ""}</p>`
+        + (mo.quality === "haze" ? `<p class="s2-skip">⚠ 本月影像受霾影響，變化數值僅供參考；可能變裸露的地點列為「待確認」，等下一個清晰月份再判定。</p>`
+          : mo.quality === "partial" ? `<p class="s2-skip">本月部分雲遮，只比較兩個月都有影像的 ${mo.compared_pct ?? "—"}% 流域範圍。</p>` : "") : "")
     : `<p class="muted-empty">${emptyMsg}</p>`;
   const marksLegend = `<span><i class="mk" style="border-color:#dc2626"></i>系統標記（編號對應右側清單）</span>`;
   document.querySelector("#s2AnomLegend").innerHTML = useLayer === "recovery"
@@ -3242,8 +3245,11 @@ function s2RenderAnomaly(m) {
     } else {
       const dec = mo.dec_ha || {}; const inc = mo.inc_ha || {};
       const pair = (a, b) => `<span class="t-red">−${a ?? 0}</span> ／ <span class="t-green">+${b ?? 0}</span> ha`;
+      const un = list.filter((b) => b.class === "uncertain").length;
+      const qTxt = { clear: "影像清晰", partial: "部分雲遮", haze: "受霾，僅供參考" }[mo.quality] || "";
       plain.innerHTML = tile(nb.length ? "red" : "green", `新增裸露區塊（與 ${s2Esc(mo.prev_roc || s2RocOf(mo.prev))} 比）`, `${nb.length} 處`,
-          nb.length ? "上個月還有植物、這個月變裸露的地點，請對照衛星照片確認" : "沒有發現上個月有植物、這個月變裸露的地點")
+          (nb.length ? "上個月還有植物、這個月變裸露的地點，請對照衛星照片確認" : "沒有發現上個月有植物、這個月變裸露的地點")
+          + (un ? `；另 ${un} 處受霾待確認` : "") + (qTxt ? `（${qTxt}）` : ""))
         + tile("amber", "崩積／殘壩區變化", pair(dec.r1, inc.r1), `植物明顯減少／增加的面積（${s2Pitch((dec.r1 || 0) + (inc.r1 || 0))}）`)
         + tile("amber", "下游河道變化", pair(dec.downstream, inc.downstream), "河道沖淤與河灘植被的增減");
       badge.textContent = nb.length ? `較上月新增裸露 ${nb.length} 處` : "較上月無新增裸露";
