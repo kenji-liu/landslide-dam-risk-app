@@ -2528,3 +2528,53 @@ body.s2-lb-open { overflow: hidden; }
 .ai-reply .bad { color: #b91c1c; }
 @media (max-width: 1180px) { .mon-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .mon-form { grid-template-columns: 1fr; } }
+
+/* ---- v5：植生變化白話化、疊合、點選對應 ---- */
+.s2-blend[hidden], .mon-map-wrap [hidden] { display: none !important; }
+.s2-plain { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 4px 0 12px; }
+.s2-plain-tile { border: 1px solid #dde6ea; border-left: 5px solid #94a3b8; border-radius: 10px; padding: 12px 14px; background: #fbfdfd; display: flex; flex-direction: column; gap: 4px; }
+.s2-plain-tile span { font-size: 13px; color: #4b5f6e; font-weight: 700; }
+.s2-plain-tile strong { font-size: 26px; line-height: 1.15; color: #16303f; }
+.s2-plain-tile small { font-size: 13px; color: #5b6f7d; line-height: 1.5; }
+.s2-plain-tile.red { border-left-color: #dc2626; background: #fff7f7; }
+.s2-plain-tile.red strong { color: #b91c1c; }
+.s2-plain-tile.green { border-left-color: #16a34a; }
+.s2-plain-tile.amber { border-left-color: #d97706; }
+.s2-plain-tile.grey { border-left-color: #94a3b8; }
+.s2-recbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #e5e7eb; margin: 4px 0 2px; }
+.s2-recbar i { display: block; height: 100%; }
+.t-red { color: #b91c1c; }
+.t-green { color: #15803d; }
+.s2-tech { margin: 0 0 10px; font-size: 13px; color: #4b5f6e; }
+.s2-tech summary { cursor: pointer; color: #1f6f8b; font-weight: 700; }
+.s2-tech p { margin: 6px 0 0; line-height: 1.7; }
+.s2-skip { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: #fff7ed; color: #9a3412; font-size: 13px; }
+.s2-blend { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #3f5566; font-weight: 700; }
+.s2-blend input[type=range] { width: 150px; accent-color: #0f766e; }
+.s2-blend.lb { color: #e2e8f0; margin-left: 8px; }
+.s2-list-hint { margin: 2px 0 6px; }
+.s2-anom-list { max-height: 460px; overflow: auto; }
+.s2-anom-row, .mon-row { cursor: pointer; }
+.s2-anom-row:hover td, .mon-row:hover td { background: #f1f7f9; }
+.s2-anom-row.on td, .mon-row.on td { background: #fff4d6; }
+.s2-anom-row.on td:first-child, .mon-row.on td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
+.s2-num { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; color: #fff; font-size: 12px; font-weight: 800; }
+.s2-locate, .mon-acts button { padding: 3px 9px; font-size: 12px; white-space: nowrap; }
+.mon-acts { display: flex; gap: 6px; }
+.s2-pick { cursor: pointer; }
+.s2-pick .halo { fill: none; stroke: rgba(255, 255, 255, 0.9); stroke-width: 5; }
+.s2-pick .ring { fill: rgba(255, 255, 255, 0.08); stroke-width: 3.5; pointer-events: all; }
+.s2-pick.on .ring { stroke-width: 6; }
+.s2-pick.on .halo { animation: s2pulse 1.4s ease-in-out infinite; }
+.s2-pick .cross line { stroke-width: 4; }
+.s2-pick.dim { opacity: 0.4; }
+@keyframes s2pulse { 0%, 100% { stroke-width: 5; } 50% { stroke-width: 12; } }
+.s2-legend .mk { display: inline-block; width: 12px; height: 12px; border: 3px solid; border-radius: 50%; }
+.s2-legend .mk.sq { border-radius: 3px; }
+.mon-map-wrap { margin: 0 0 12px; }
+.mon-map-wrap .s2-overview-toolbar { margin-bottom: 4px; }
+.mon-map-wrap #monMapTime { margin: 0 0 6px; }
+.mon-grid { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); }
+@media (max-width: 1180px) { .mon-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .s2-plain { grid-template-columns: 1fr; } .s2-blend input[type=range] { width: 110px; } }
+@media (prefers-reduced-motion: reduce) { .s2-pick.on .halo { animation: none; } }
