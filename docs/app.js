@@ -1168,7 +1168,7 @@ DBI = ${fmt(latest.dbi)}，AHWL_Dis = ${fmt(latest.ahwlDis)}，HDSI = ${fmt(late
 以蓄水體積 ${fmt(latest.VW, 0)} m³ 與潰壩歷時 ${fmt(latest.TcHr, 1)} hr 進行洪峰流量初估，代表洪峰流量約 ${fmt(latest.qpSelected, 0)} m³/s，代表斷面水深約 ${fmt(latest.waterDepth, 1)} m；保全危害度判定為「${latest.exposure}」。
 
 四、初步致災風險與處置建議
-依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。${storageLine}${modelLine}`;
+依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。${storageLine}${modelLine}${typeof monState !== "undefined" && monState ? monitoringReportSection() : ""}`;
 }
 
 function renderAiSummary() {
@@ -1176,6 +1176,8 @@ function renderAiSummary() {
     <p><b>風險主軸：</b>${latest.caseName} 的 DBI 可能顯示壩體具一定穩定性，但 AHWL 系列若出現不穩定，仍應以高潰壩危險度進行保守管理。</p>
     <p><b>監測重點：</b>優先追蹤壩頂溢流、滲流出水、壩體裂縫、蓄水位變化、下游河床沖刷與降雨入流條件。</p>
     <p><b>決策建議：</b>在外業資料未補齊前，建議維持 ${latest.monitoring}，並依 ${latest.alert} 原則辦理；若後續雨量或水位上升，應即時更新洪峰流量與保全對象影響範圍。</p>
+    ${typeof monState !== "undefined" && monState && monState.digest ? `<p><b>監測現況（${monState.digest.roc_month} ${monState.digest.kind}）：</b>${(monState.digest.conclusions || []).filter((c) => /綜合研判|SAR|新生/.test(c)).map((c) => c.replace(/</g, "&lt;")).join(" ")}</p>` : ""}
+    ${typeof monState !== "undefined" && monState && monState.items && monState.items.length ? `<p class="warn-text"><b>異常通報：</b>${monState.items.length} 件，請至「通報報告」頁查看與回報。</p>` : ""}
   `;
   if (aiReply && !aiReply.dataset.locked) {
     aiReply.innerHTML = `<p class="ai-placeholder">輸入問題後按「產生專家回覆」，系統會依目前參數即時生成回覆。</p>`;
@@ -2442,7 +2444,10 @@ const s2Layers = {
   ndvi: { label: "NDVI 裸露／植生", extent: "view" },
   ndwi: { label: "NDWI 水域", extent: "view" },
   overview: { label: "全流域 真色＋水域", extent: "overview" },
-  overview_ndvi: { label: "全流域 NDVI 裸露", extent: "overview" }
+  overview_ndvi: { label: "全流域 NDVI 裸露", extent: "overview" },
+  zanom: { label: "NDVI 異常 z-score", extent: "view" },
+  recovery: { label: "R1 復育分區", extent: "view" },
+  overview_zanom: { label: "全流域 NDVI 異常", extent: "overview" }
 };
 
 function s2Rings(overlay, w, h) {
@@ -2486,8 +2491,10 @@ function s2FigureSvg(layer, m, opts = {}) {
       + poly("lake_max", "s2-ov-lake") + poly("debris", "s2-ov-debris") + poly("residual", "s2-ov-residual");
     body += label("downstream", "下游裸露計算範圍（土砂堆積＋沖淤調節區）", "downstream", "below");
     if (opts.marks !== false) {
-      body += (m.new_water || []).map((f, i) => {
-        const c = s2NewWaterClass[f.class] || s2NewWaterClass.new_candidate;
+      const anomMode = layer === "overview_zanom";
+      const markList = anomMode ? (m.ndvi_anomaly?.candidates || []) : (m.new_water || []);
+      body += markList.map((f, i) => {
+        const c = anomMode ? (s2AnomClass[f.class] || s2AnomClass.new) : (s2NewWaterClass[f.class] || s2NewWaterClass.new_candidate);
         const r = Math.max(9, Math.min(30, Math.sqrt(f.area_ha) * 5));
         return `<g class="s2-nw-mark"><circle cx="${f.ox * w}" cy="${f.oy * h}" r="${r}" stroke="${c.color}"></circle>
           <text x="${f.ox * w + r + 3}" y="${f.oy * h + 4}" fill="${c.color}">${i + 1}</text><title>${c.label} ${f.area_ha} ha</title></g>`;
@@ -2515,8 +2522,9 @@ function s2DetectionTimeline(index) {
     const cls = (m.new_water || []).map((f) => f.class);
     let tone = "none"; let tip = "無影像";
     const w = m.water_area_ha;
-    const wTxt = w == null ? "" : `；壩區水域${m.water_area_is_minimum ? "≥" : ""}${w.toFixed(1)} ha`;
-    const lakeWater = cls.includes("known_lake") || (w != null && w >= 10);   // 事件前壩區水域多在5 ha以下
+    const lakeW = s2LakeWater(m);
+    const wTxt = (lakeW != null ? `；既有湖區水域 ${lakeW.toFixed(1)} ha` : "") + (w == null ? "" : `；壩區水域${m.water_area_is_minimum ? "≥" : ""}${w.toFixed(1)} ha`);
+    const lakeWater = lakeW != null || (m.month >= S2_EVENT_START && cls.includes("known_lake"));   // 2025-07 前無堰塞湖
     if (m.images && !m.water_scanned) {
       tone = lakeWater ? "lake" : "cloud"; tip = `雲遮過多，未做全流域掃描${wTxt}`;
     } else if (m.water_scanned) {
@@ -2541,6 +2549,9 @@ function s2RenderOverview(m, index) {
     ${scenes.length ? `｜影像日期：${scenes.map((s) => s.date.slice(5).replace("-", "/")).join("、")}` : "｜本月無可用影像"}${m.final ? "" : "｜暫定"}`;
   document.querySelector("#s2Overview").innerHTML = `<div class="s2-zoomable" data-s2-zoom="${layer}" tabindex="0" role="button" aria-label="放大全流域圖">${s2FigureSvg(layer, m, { stamp: true })}</div>`;
   document.querySelector("#s2DetectionTimeline").innerHTML = s2DetectionTimeline(index);
+  const wl = document.querySelector("#s2WaterLegend");
+  if (wl && s2State.data.water_legend) wl.innerHTML = s2State.data.water_legend.map((x) => `<span><i class="sw" style="background:${x.color};height:10px"></i>${x.label}</span>`).join("")
+    + `<span><i class="sw" style="background:#ececec;height:10px;border:1px solid #d0d5d9"></i>雲遮</span>`;
 
   const found = m.new_water || [];
   const nNew = found.filter((f) => f.class === "new_candidate").length;
@@ -2548,7 +2559,10 @@ function s2RenderOverview(m, index) {
   badge.textContent = !m.images ? "本月無觀測" : !m.water_scanned ? "雲遮過多，本月未掃描" : nNew ? `新生水域候選 ${nNew} 處` : "未偵測到新生水域候選";
   badge.classList.toggle("alert", nNew > 0);
   const routine = found.filter((f) => f.class === "downstream_channel" || f.class === "transient");
-  const notable = found.map((f, i) => ({ ...f, n: i + 1 })).filter((f) => f.class !== "downstream_channel" && f.class !== "transient");
+  const lakeW = s2LakeWater(m);
+  const notable = found.map((f, i) => ({ ...f, n: i + 1 }))
+    .filter((f) => f.class !== "downstream_channel" && f.class !== "transient" && !(lakeW != null && f.class === "known_lake"));
+  if (lakeW != null) notable.unshift({ n: "湖", class: "known_lake", area_ha: lakeW, lat: 23.6973, lon: 121.2903, aggregate: true });
   const routineNote = routine.length
     ? `<p class="s2-small">另有 ${routine.length} 處河道水域變遷／單月孤立訊號（地圖灰圈，共 ${routine.reduce((a, f) => a + f.area_ha, 0).toFixed(1)} ha），屬河道擺盪或雲影，不列入警示。</p>` : "";
   document.querySelector("#s2NewWaterList").innerHTML = !m.images
@@ -2558,7 +2572,7 @@ function s2RenderOverview(m, index) {
       : (notable.length
         ? `<table class="s2-nw-table"><thead><tr><th>#</th><th>類型</th><th>面積</th><th>座標</th></tr></thead><tbody>${notable.map((f) => {
             const c = s2NewWaterClass[f.class] || s2NewWaterClass.new_candidate;
-            return `<tr><td>${f.n}</td><td><span class="s2-nw-chip ${c.tone}">${c.label}${f.pending_confirm ? "（待下月確認）" : ""}</span></td><td>${f.area_ha} ha</td><td>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}</td></tr>`;
+            return `<tr><td>${f.n}</td><td><span class="s2-nw-chip ${c.tone}">${c.label}${f.aggregate ? "（湖區範圍合計）" : ""}${f.pending_confirm ? "（待下月確認）" : ""}</span></td><td>${f.area_ha} ha</td><td>${f.aggregate ? "2025堰塞湖範圍" : `${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}`}</td></tr>`;
           }).join("")}</tbody></table>`
         : `<p class="muted-empty">本月無需關注的新增水體。</p>`) + routineNote;
 }
@@ -2701,7 +2715,9 @@ document.querySelector("#sentinel2")?.addEventListener("click", (e) => {
   const idx = e.target.closest("[data-s2-index]");
   if (idx) { selectS2Observation(Number(idx.dataset.s2Index)); return; }
   const ovl = e.target.closest("[data-s2-ovlayer]");
-  if (ovl) { s2State.ovLayer = ovl.dataset.s2Ovlayer; renderSentinel2View(); }
+  if (ovl) { s2State.ovLayer = ovl.dataset.s2Ovlayer; renderSentinel2View(); return; }
+  const anl = e.target.closest("[data-s2-anomlayer]");
+  if (anl && !anl.disabled) { s2State.anomLayer = anl.dataset.s2Anomlayer; renderSentinel2View(); }
 });
 document.querySelector("#sentinel2")?.addEventListener("keydown", (e) => {
   const z = e.target.closest("[data-s2-zoom]");
@@ -2827,6 +2843,7 @@ function renderSentinel2View() {
   document.querySelector("#s2TrendChart").innerHTML = s2LineChart(s2State.metric, index);
   document.querySelector("#s2WaterChart").innerHTML = s2WaterChart(index);
   s2RenderOverview(m, index);
+  s2RenderAnomaly(m);
 
   document.querySelectorAll("[data-s2-metric]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2859,6 +2876,7 @@ async function initSentinel2() {
     document.querySelector("#s2Limitations").textContent = `${data.limitations}${data.period.note}`;
     document.querySelector("#s2Source").textContent = `資料來源：${data.source}｜資料更新：${data.updated_at}`;
     renderSentinel2View();
+    s2RenderBasis();
   } catch (error) {
     document.querySelector("#s2ImagePanels").innerHTML = `<p class="muted-empty">Sentinel-2資料載入失敗：${error.message}</p>`;
   }
@@ -2963,6 +2981,316 @@ document.querySelectorAll("#s2MailForm [data-mail-action]").forEach((b) => {
   if (b.type !== "submit") b.addEventListener("click", () => s2MailAction(b.dataset.mailAction));
 });
 initS2Mail();
+
+// ================================================================ v3：異常偵測、通報回報、Gemini
+const S2_EVENT_START = "2025-07";
+const s2AnomClass = {
+  new: { label: "新生崩塌候選", color: "#dc2626", tone: "nw-new" },
+  new_pending: { label: "新生崩塌候選（待下月確認）", color: "#f97316", tone: "nw-new" },
+  persisting: { label: "已偵測崩塌（持續）", color: "#7c3aed", tone: "nw-lake" },
+  old_slide: { label: "既有崩塌地再變化", color: "#92400e", tone: "nw-slide" },
+  r1: { label: "崩積／殘壩區（已知）", color: "#a16207", tone: "nw-slide" },
+  lake: { label: "堰塞湖區", color: "#1d6fd8", tone: "nw-lake" },
+  downstream: { label: "下游河道", color: "#64748b", tone: "nw-down" },
+  channel: { label: "主流河道廊帶", color: "#64748b", tone: "nw-down" },
+  transient: { label: "單月孤立訊號", color: "#94a3b8", tone: "nw-down" }
+};
+
+function s2Esc(v) {
+  return String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function s2LakeWater(m) {
+  if (m.month < S2_EVENT_START) return null;
+  const w = m.lake_zone_water_ha;
+  return w != null && w >= 0.5 ? w : null;
+}
+
+function s2RenderAnomaly(m) {
+  const box = document.querySelector("#s2AnomCard");
+  if (!box) return;
+  const a = m.ndvi_anomaly;
+  const layer = s2State.anomLayer || "zanom";
+  const avail = { zanom: !!m.images?.zanom, overview_zanom: !!m.images?.overview_zanom, recovery: !!m.images?.recovery };
+  const useLayer = avail[layer] ? layer : (avail.zanom ? "zanom" : null);
+  document.querySelector("#s2AnomTabs").innerHTML = [["zanom", "詳圖 z-score"], ["overview_zanom", "全流域 z-score"], ["recovery", "R1 復育分區"]]
+    .map(([k, t]) => `<button type="button" data-s2-anomlayer="${k}" class="${k === useLayer ? "active" : ""}" ${avail[k] ? "" : "disabled"}>${t}</button>`).join("");
+  document.querySelector("#s2AnomFigure").innerHTML = useLayer
+    ? `<div class="s2-zoomable" data-s2-zoom="${useLayer}" tabindex="0" role="button" aria-label="放大">${s2FigureSvg(useLayer, m, { stamp: true })}</div>`
+    : `<p class="muted-empty">本月無 NDVI 異常資料（無影像或基準不足）。</p>`;
+  const legend = useLayer === "recovery"
+    ? `<span><i class="sw" style="background:#16a34a"></i>自然復育（NDVI≥0.30 或 ΔNDVI≥0.15）</span><span><i class="sw" style="background:#facc15"></i>緩慢復育（ΔNDVI 0.05–0.15）</span><span><i class="sw" style="background:#dc2626"></i>建議人工植生評估（ΔNDVI&lt;0.05）</span>`
+    : `<span><i class="ramp zramp"></i>z −3 → +3（紅＝低於同月份常態）</span><span><i class="sw" style="background:#d6d3d1"></i>地形陰影／基準不足</span><span><i class="sw" style="background:#fff;border:1px solid #c9d3d9"></i>雲遮</span>`;
+  document.querySelector("#s2AnomLegend").innerHTML = legend;
+  if (!a) {
+    document.querySelector("#s2AnomStats").innerHTML = `<p class="muted-empty">本月無可判釋影像。</p>`;
+    document.querySelector("#s2AnomList").innerHTML = "";
+  } else {
+    const n = a.neg_ha || {};
+    document.querySelector("#s2AnomStats").innerHTML = `<ul class="s2-anom-facts">
+      <li>基準：${s2Esc(a.baseline)}${a.in_baseline ? "（本月位於基準期內）" : ""}</li>
+      <li>可判釋面積 ${a.usable_ha} ha；地形陰影遮罩 ${a.shadow_ha} ha</li>
+      ${a.skipped ? `<li><strong>本月不列候選：${s2Esc(a.skipped)}</strong>（${a.skipped === "基準不足" ? "同月份基準影像不足，無法可靠比較" : "參考林NDVI偏離同季節基準，影像受霾或殘雲影響"}）</li>` : ""}
+      <li>負異常面積（z≤−2、ΔNDVI≤−0.20、NDVI&lt;0.25）：R1 ${n.r1 ?? 0} ha、下游 ${n.downstream ?? 0} ha、其他 ${n.other ?? 0} ha</li>
+      <li>R1 平均 z：${a.r1_mean_z ?? "—"}</li></ul>`;
+    const c = a.candidates || [];
+    const alertN = c.filter((f) => f.class === "new" || f.class === "new_pending").length;
+    document.querySelector("#s2AnomBadge").textContent = alertN ? `新生崩塌候選 ${alertN} 處` : "未見新生崩塌候選";
+    document.querySelector("#s2AnomBadge").classList.toggle("alert", alertN > 0);
+    document.querySelector("#s2AnomList").innerHTML = c.length
+      ? `<table class="s2-nw-table"><thead><tr><th>#</th><th>類型</th><th>面積</th><th>座標</th></tr></thead><tbody>${c.map((f, i) => {
+          const k = s2AnomClass[f.class] || s2AnomClass.new;
+          return `<tr><td>${i + 1}</td><td><span class="s2-nw-chip ${k.tone}">${k.label}</span></td><td>${f.area_ha} ha</td><td>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}</td></tr>`;
+        }).join("")}</tbody></table>`
+      : `<p class="muted-empty">本月無面積 ≥1 ha 的 NDVI 負異常區塊。</p>`;
+  }
+  const rec = m.recovery;
+  document.querySelector("#s2RecoveryStats").innerHTML = rec
+    ? `<table class="s2-nw-table"><thead><tr><th>分區</th><th>自然復育</th><th>緩慢復育</th><th>建議人工植生評估</th><th>平均ΔNDVI</th></tr></thead><tbody>
+        ${[["debris", "崩積區"], ["residual", "殘壩區"]].map(([k, t]) => {
+          const z = rec[k] || {};
+          return `<tr><td>${t}</td><td>${z.natural_ha ?? "—"} ha</td><td>${z.slow_ha ?? "—"} ha</td><td>${z.needs_ha ?? "—"} ha</td><td>${z.mean_dndvi ?? "—"}</td></tr>`;
+        }).join("")}</tbody></table><p class="s2-small">${s2Esc(rec.window)}。分級為初篩，須以 UAV 與現地植生調查校正。</p>`
+    : `<p class="s2-small">R1 復育分區自 115/01 起提供（以 114/10–12 為事件後初期基準）。</p>`;
+}
+
+function s2RenderBasis() {
+  const d = s2State.data;
+  const box = document.querySelector("#s2Basis");
+  if (!box || !d.threshold_basis) return;
+  const refs = d.references || {};
+  box.innerHTML = `<table class="s2-basis-table"><thead><tr><th>項目</th><th>門檻</th><th>依據</th></tr></thead><tbody>${d.threshold_basis.map((b) =>
+      `<tr><td>${s2Esc(b.item)}</td><td>${s2Esc(b.rule)}</td><td>${s2Esc(b.basis)}</td></tr>`).join("")}</tbody></table>
+    <details class="s2-refs"><summary>參考文獻（${Object.keys(refs).length} 篇）</summary><ol>${Object.values(refs).map((r) => `<li>${s2Esc(r)}</li>`).join("")}</ol>
+    <p class="s2-small">${s2Esc(d.reference_note || "")}</p></details>`;
+}
+
+// ---------------------------------------------------------------- 通報報告：監測摘要與異常通報回報
+var monState = { digest: null, sar: null, feedback: {}, items: [] };
+
+async function s2EndpointReady() {
+  if (s2Mail.endpoint) return s2Mail.endpoint;
+  try {
+    const r = await fetch("./assets/sentinel2/report_mailer.json", { cache: "no-store" });
+    if (r.ok) s2Mail.endpoint = (await r.json()).endpoint || null;
+  } catch (e) { /* 未設定 */ }
+  return s2Mail.endpoint;
+}
+
+function monAnomalies() {
+  const out = [];
+  const d = monState.digest;
+  (d?.anomalies || []).forEach((a) => out.push(a));
+  const st = monState.sar;
+  if (st) {
+    (st.points || []).filter((p) => p.level_class === "warn" || p.level_class === "danger").forEach((p) => {
+      const pair = (st.freshness?.latest_pair || "").replace(/[^0-9]/g, "").slice(0, 16);
+      out.push({ id: `SAR-${pair}-${p.name === "壩區" ? "DAM" : p.name === "堰塞湖區" ? "LAKE" : "ANOM"}`, source: "SAR", type: p.level,
+        title: `SAR ${p.level}：${p.name}`, location: `${p.lat?.toFixed?.(4) ?? ""}, ${p.lon?.toFixed?.(4) ?? ""}`, value: p.latest, date: st.freshness?.latest_acquisition, severity: p.level_class === "danger" ? "high" : "medium" });
+    });
+  }
+  Object.values(monState.feedback).filter((f) => String(f.id).startsWith("MAN-")).forEach((f) =>
+    out.push({ id: f.id, source: "現地／人工", type: "人工通報", title: f.title || "人工通報", location: "", value: "", date: (f.updated || "").slice(0, 10), severity: "medium" }));
+  return out;
+}
+
+function renderMonitoringNotice() {
+  const box = document.querySelector("#monDigest");
+  if (!box) return;
+  const d = monState.digest;
+  const st = monState.sar;
+  const sarLine = st ? `SAR（Sentinel-1）最新配對 ${s2Esc(st.freshness?.latest_pair || "—")}，整體「${s2Esc(st.alert?.label || "—")}」，最後觀測距今 ${st.freshness?.latency_days ?? "—"} 天。` : "SAR 狀態載入中或無資料。";
+  box.innerHTML = d
+    ? `<p class="mon-head"><b>${s2Esc(d.roc_month)}（${s2Esc(d.month)}）${s2Esc(d.kind)}</b>｜產製 ${s2Esc(d.generated_at)}${d.sent_at ? `｜已寄送 ${s2Esc(d.sent_at)}` : ""}</p>
+       <ul class="mon-list">${(d.conclusions || []).map((c) => `<li class="${c.startsWith("⚠") ? "warn" : ""}">${s2Esc(c)}</li>`).join("")}</ul>
+       <p class="s2-small">最新 SAR：${sarLine}</p>`
+    : `<p class="muted-empty">尚無監測月報摘要。</p><p class="s2-small">${sarLine}</p>`;
+  const list = monAnomalies();
+  monState.items = list;
+  const tb = document.querySelector("#monAnomalies");
+  const statusOf = (id) => monState.feedback[id]?.status || "待查證";
+  const tone = { "待查證": "pending", "查證中": "working", "已確認異常": "confirmed", "誤報結案": "closed" };
+  document.querySelector("#monAnomBadge").textContent = list.length ? `異常 ${list.length} 件（未結案 ${list.filter((a) => !["誤報結案"].includes(statusOf(a.id))).length}）` : "目前無異常通報";
+  tb.innerHTML = list.length
+    ? `<table class="s2-nw-table mon-table"><thead><tr><th>編號</th><th>來源／類型</th><th>內容</th><th>位置</th><th>日期</th><th>狀態</th><th></th></tr></thead><tbody>${list.map((a) =>
+        `<tr><td>${s2Esc(a.id)}</td><td>${s2Esc(a.source)}<br><small>${s2Esc(a.type)}</small></td><td>${s2Esc(a.title)}${a.value ? `<br><small>${s2Esc(a.value)}</small>` : ""}</td>
+         <td>${s2Esc(a.location)}</td><td>${s2Esc(a.date || "")}</td><td><span class="mon-status ${tone[statusOf(a.id)] || "pending"}">${statusOf(a.id)}</span></td>
+         <td><button type="button" class="outline mon-reply" data-mon-id="${s2Esc(a.id)}">回報</button></td></tr>`).join("")}</tbody></table>`
+    : `<p class="muted-empty">目前無 Sentinel-2 新生水域／新生崩塌候選，SAR 亦未達黃色或紅色警戒。</p>`;
+  const sel = document.querySelector("#monFbId");
+  if (sel) sel.innerHTML = list.map((a) => `<option value="${s2Esc(a.id)}">${s2Esc(a.id)}｜${s2Esc(a.title)}</option>`).join("") || `<option value="">（無異常）</option>`;
+}
+
+async function monPost(payload) {
+  const ep = await s2EndpointReady();
+  if (!ep) throw new Error("寄送服務尚未設定");
+  const r = await fetch(ep, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+  return r.json();
+}
+
+async function initMonitoringNotice() {
+  if (!document.querySelector("#monDigest")) return;
+  try {
+    const r = await fetch("./assets/sentinel2/monitoring_digest.json", { cache: "no-store" });
+    if (r.ok) monState.digest = await r.json();
+  } catch (e) { /* 無摘要 */ }
+  try {
+    const r = await fetch("./monitor_status.json", { cache: "no-store" });
+    if (r.ok) monState.sar = await r.json();
+  } catch (e) { /* 無SAR */ }
+  try {
+    const res = await monPost({ action: "list_feedback" });
+    (res.items || []).forEach((f) => { monState.feedback[f.id] = f; });
+  } catch (e) { /* 無回報 */ }
+  renderMonitoringNotice();
+  renderReport();
+}
+
+function monShow(msg, tone) {
+  const box = document.querySelector("#monFbResult");
+  box.className = `s2-mail-result ${tone || ""}`;
+  box.innerHTML = msg;
+}
+
+document.querySelector("#monAnomalies")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-mon-id]");
+  if (!b) return;
+  document.querySelector("#monFbMode").value = "update";
+  document.querySelector("#monFbId").value = b.dataset.monId;
+  document.querySelector("#monFbForm").scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
+document.querySelector("#monFbMode")?.addEventListener("change", (e) => {
+  const manual = e.target.value === "new";
+  document.querySelector("#monFbIdWrap").hidden = manual;
+  document.querySelector("#monFbTitleWrap").hidden = !manual;
+});
+
+document.querySelector("#monFbForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const manual = document.querySelector("#monFbMode").value === "new";
+  const id = manual ? `MAN-${new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 12)}` : document.querySelector("#monFbId").value;
+  const title = manual ? document.querySelector("#monFbTitle").value.trim() : (monState.items.find((a) => a.id === id)?.title || "");
+  const password = document.querySelector("#monFbPass").value;
+  if (!id) { monShow("請選擇通報項目。", "bad"); return; }
+  if (manual && !title) { monShow("請輸入通報標題。", "bad"); return; }
+  if (!password) { monShow("請輸入權限密碼。", "bad"); return; }
+  monShow("儲存中…");
+  try {
+    const res = await monPost({ action: "save_feedback", password, id, title, status: document.querySelector("#monFbStatus").value,
+      responder: document.querySelector("#monFbWho").value.trim(), note: document.querySelector("#monFbNote").value.trim() });
+    if (!res.ok) { monShow(s2Esc(res.error || "儲存失敗"), "bad"); return; }
+    monState.feedback[res.item.id] = res.item;
+    monShow(s2Esc(res.message), "good");
+    document.querySelector("#monFbNote").value = "";
+    renderMonitoringNotice();
+  } catch (err) {
+    monShow(`無法連線：${s2Esc(err.message)}`, "bad");
+  } finally {
+    document.querySelector("#monFbPass").value = "";
+  }
+});
+
+document.querySelector("#monFbHistory")?.addEventListener("click", async () => {
+  const password = document.querySelector("#monFbPass").value;
+  if (!password) { monShow("查看完整紀錄需輸入權限密碼。", "bad"); return; }
+  try {
+    const res = await monPost({ action: "list_feedback_full", password });
+    if (!res.ok) { monShow(s2Esc(res.error), "bad"); return; }
+    monShow(res.items.length ? `<ul class="mon-list">${res.items.map((f) => `<li><b>${s2Esc(f.id)}</b>｜${s2Esc(f.title)}｜${s2Esc(f.status)}｜${s2Esc(f.responder)}｜${s2Esc((f.updated || "").slice(0, 16).replace("T", " "))}<br><small>${s2Esc(f.note)}</small></li>`).join("")}</ul>` : "尚無回報紀錄。", "good");
+  } catch (err) {
+    monShow(`無法連線：${s2Esc(err.message)}`, "bad");
+  } finally {
+    document.querySelector("#monFbPass").value = "";
+  }
+});
+
+function monitoringReportSection() {
+  const d = monState.digest;
+  const lines = [];
+  if (d) {
+    lines.push(`\n五、遙測監測摘要（${d.roc_month} ${d.kind}，Sentinel-2＋SAR）`);
+    (d.conclusions || []).forEach((c) => lines.push(`・${c}`));
+  }
+  const list = monState.items || [];
+  if (list.length) {
+    lines.push(`\n六、異常通報與回報（${list.length} 件）`);
+    list.forEach((a) => lines.push(`・${a.id}｜${a.title}｜${a.location || "—"}｜${monState.feedback[a.id]?.status || "待查證"}`));
+  }
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------- AI 專家摘要：監測整合＋Gemini
+function monitoringContextText() {
+  const lines = ["【案件參數】", ...keyMetricLines()];
+  const d = monState.digest;
+  if (d) {
+    lines.push(`【遙測監測 ${d.roc_month} ${d.kind}】`, ...(d.conclusions || []));
+  }
+  const st = monState.sar;
+  if (st) {
+    lines.push(`【SAR】最新配對 ${st.freshness?.latest_pair}，${st.alert?.label}；` + (st.points || []).map((p) => `${p.name} ${p.latest}（${p.level}）`).join("；"));
+  }
+  const list = monState.items || [];
+  if (list.length) lines.push("【異常通報】" + list.map((a) => `${a.title}（${monState.feedback[a.id]?.status || "待查證"}）`).join("；"));
+  return lines.join("\n");
+}
+
+async function initGeminiPanel() {
+  const box = document.querySelector("#geminiStatus");
+  if (!box) return;
+  try {
+    const st = await monPost({ action: "ai_status" });
+    const ok = st.ok && st.enabled;
+    box.textContent = ok ? `Gemini 2.5 Flash 已啟用｜今日剩餘 ${st.remaining} 次` : "Gemini 尚未設定 API 金鑰";
+    box.classList.toggle("alert", !ok);
+    document.querySelector("#geminiKeyForm").hidden = ok;
+    document.querySelector("#generateGemini").disabled = !ok;
+  } catch (e) {
+    box.textContent = "無法連線 AI 服務";
+    document.querySelector("#generateGemini").disabled = true;
+  }
+}
+
+document.querySelector("#generateGemini")?.addEventListener("click", async () => {
+  const btn = document.querySelector("#generateGemini");
+  btn.disabled = true;
+  aiReply.dataset.locked = "true";
+  aiReply.innerHTML = `<p class="ai-placeholder">Gemini 判讀中（約 5–20 秒）…</p>`;
+  try {
+    const res = await monPost({ action: "ai_summary", question: aiQuestion.value || "請綜合判讀目前狀況並提出建議。", context: monitoringContextText() });
+    if (!res.ok) { aiReply.innerHTML = `<p class="bad">${s2Esc(res.error)}</p>`; return; }
+    aiReply.innerHTML = `<p><b>【Gemini 2.5 Flash 判讀】</b></p>` + s2Esc(res.text).split("\n").map((l) => l.trim() ? `<p>${l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}</p>` : "<br>").join("")
+      + `<p class="s2-small">本回覆由 Gemini 依本頁案件參數與監測摘要生成，僅供專家輔助；正式判斷請依現地查證與主管機關程序。今日剩餘 ${res.remaining} 次。</p>`;
+    document.querySelector("#geminiStatus").textContent = `Gemini 2.5 Flash 已啟用｜今日剩餘 ${res.remaining} 次`;
+  } catch (err) {
+    aiReply.innerHTML = `<p class="bad">無法連線 AI 服務：${s2Esc(err.message)}</p>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.querySelector("#geminiKeyForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const out = document.querySelector("#geminiKeyResult");
+  const key = document.querySelector("#geminiKey").value.trim();
+  const password = document.querySelector("#geminiPass").value;
+  if (!key || !password) { out.className = "s2-mail-result bad"; out.textContent = "請輸入 API 金鑰與權限密碼。"; return; }
+  out.className = "s2-mail-result"; out.textContent = "設定中…";
+  try {
+    const res = await monPost({ action: "set_ai_key", password, api_key: key });
+    out.className = `s2-mail-result ${res.ok ? "good" : "bad"}`;
+    out.textContent = res.ok ? res.message : res.error;
+    if (res.ok) initGeminiPanel();
+  } catch (err) {
+    out.className = "s2-mail-result bad"; out.textContent = `無法連線：${err.message}`;
+  } finally {
+    document.querySelector("#geminiKey").value = "";
+    document.querySelector("#geminiPass").value = "";
+  }
+});
+
+initMonitoringNotice().then(() => { renderAiSummary(); initGeminiPanel(); });
 
 document.querySelector("#s2Prev")?.addEventListener("click", () => s2Step(-1));
 document.querySelector("#s2Next")?.addEventListener("click", () => s2Step(1));

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260927-s2fix" />
+    <link rel="stylesheet" href="./styles.css?v=20260927-s2v4" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -595,11 +595,36 @@
           <div class="s2-overview-grid">
             <div>
               <div id="s2Overview" class="s2-overview-map"></div>
+              <div id="s2WaterLegend" class="s2-legend"></div>
               <div id="s2DetectionTimeline" class="s2-detection-timeline" aria-label="逐月新生水域偵測時間軸"></div>
             </div>
             <div>
               <p class="s2-overview-note">與2015–2025年6月事件前基準水域比對，標出面積≥1 ha、寬度約50 m以上的新增水體。<b class="nw-new">紅色</b>為新生水域候選（前後月份持續出現，需人工確認），<b class="nw-lake">藍色</b>為既有堰塞湖區，<b class="nw-slide">褐色</b>為崩積／殘壩區表面積水，<b class="nw-down">灰色</b>為河道水域變遷或單月孤立訊號。以2025堰塞湖盲測，系統於114/08首度偵測（54.6 ha）。</p>
               <div id="s2NewWaterList" class="s2-newwater-list"></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="s2-overview-card" id="s2AnomCard">
+          <div class="s2-card-head">
+            <div>
+              <span class="section-kicker">NDVI anomaly &amp; recovery</span>
+              <h3>NDVI 同月份異常偵測與 R1 植生復育分區</h3>
+            </div>
+            <span id="s2AnomBadge" class="s2-observation-count"></span>
+          </div>
+          <p class="s2-overview-note">以 2019–2024 年同月份 NDVI 平均與標準差為基準（去除季節性），z ≤ −2、ΔNDVI ≤ −0.20 且當月 NDVI z ≤ −2 且 ΔNDVI ≤ −0.20 的負異常區塊列為新生崩塌、土石堆積或河道擴寬候選；已依 DEM 坡度坡向與影像太陽角遮除地形陰影。lt; 0.25（達裸露定義）、面積 ≥ 1 ha 的負異常區塊列為新生崩塌、土石堆積或河道擴寬候選；已扣除參考林當月偏移與 1.5 km 局部背景（排除霾與殘留薄雲），並依 DEM 坡度坡向與影像太陽角遮除地形陰影、排除雲緣 200 m 內區塊；同一位置首次偵測後改列「持續」，不重複通報。建議流程：NDVI 異常（面的篩選）→ DEM／DSM 差分（量的驗證）→ UAV 現地（點的確認）。</p>
+          <div class="s2-overview-toolbar"><div id="s2AnomTabs" class="s2-metric-tabs" aria-label="切換異常圖層"></div></div>
+          <div class="s2-overview-grid">
+            <div>
+              <div id="s2AnomFigure" class="s2-overview-map"></div>
+              <div id="s2AnomLegend" class="s2-legend"></div>
+            </div>
+            <div>
+              <div id="s2AnomStats"></div>
+              <div id="s2AnomList"></div>
+              <h4 class="s2-sub">R1 植生復育分區（自然復育 vs. 需人工植生）</h4>
+              <div id="s2RecoveryStats"></div>
             </div>
           </div>
         </article>
@@ -640,6 +665,10 @@
             <p id="s2Limitations"></p>
           </article>
         </div>
+        <article class="s2-overview-card">
+          <div class="s2-card-head"><div><span class="section-kicker">Thresholds &amp; references</span><h3>指標門檻依據與參考文獻</h3></div></div>
+          <div id="s2Basis"></div>
+        </article>
         <p id="s2Source" class="s2-source"></p>
       </section>
 
@@ -650,6 +679,34 @@
             <p>彙整成可直接貼入緊急調查紀錄、會議簡報或通報單的摘要。</p>
           </div>
           <button id="copyReport" type="button">複製摘要</button>
+        </div>
+        <div class="mon-grid">
+          <article class="s2-overview-card">
+            <div class="s2-card-head">
+              <div><span class="section-kicker">Monitoring report</span><h3>監測通報摘要（Sentinel-2＋SAR）</h3></div>
+              <span class="s2-observation-count">每月10日定稿／25日月中</span>
+            </div>
+            <div id="monDigest"><p class="muted-empty">載入中…</p></div>
+          </article>
+          <article class="s2-overview-card">
+            <div class="s2-card-head">
+              <div><span class="section-kicker">Anomaly notice</span><h3>異常通報與回報</h3></div>
+              <span id="monAnomBadge" class="s2-observation-count">載入中</span>
+            </div>
+            <div id="monAnomalies"></div>
+            <form id="monFbForm" class="mon-form" autocomplete="off">
+              <label>類型<select id="monFbMode"><option value="update">回報既有異常</option><option value="new">新增人工通報</option></select></label>
+              <label id="monFbIdWrap">通報項目<select id="monFbId"></select></label>
+              <label id="monFbTitleWrap" hidden>通報標題<input id="monFbTitle" maxlength="120" placeholder="例：R1 下緣新崩塌（現地巡查）" /></label>
+              <label>狀態<select id="monFbStatus"><option>待查證</option><option>查證中</option><option>已確認異常</option><option>誤報結案</option></select></label>
+              <label>回報人<input id="monFbWho" maxlength="40" /></label>
+              <label class="wide">查證說明<textarea id="monFbNote" maxlength="600" placeholder="現地或UAV查證結果、處置情形"></textarea></label>
+              <label>權限密碼<input id="monFbPass" type="password" autocomplete="off" maxlength="64" /></label>
+              <div class="s2-mail-actions"><button type="submit">儲存回報</button><button type="button" class="outline" id="monFbHistory">查看完整紀錄</button></div>
+            </form>
+            <div id="monFbResult" class="s2-mail-result" aria-live="polite"></div>
+            <p class="s2-small">異常來源：Sentinel-2 新生水域／新生崩塌候選、SAR 黃紅燈警戒，以及現地人工通報。狀態公開顯示；回報人與查證說明需權限密碼查看。</p>
+          </article>
         </div>
         <textarea id="reportText" readonly></textarea>
         <div class="workflow">
@@ -687,8 +744,19 @@
               <textarea id="aiQuestion" placeholder="例：目前壩體是否可能潰決？下游保全對象應如何處置？"></textarea>
             </label>
             <div class="ai-actions">
-              <button id="generateAiReply" type="button">產生專家回覆</button>
+              <button id="generateAiReply" type="button">產生專家回覆（內建規則）</button>
               <button id="clearAiQuestion" type="button" class="outline">清空問題</button>
+            </div>
+            <div class="gemini-panel">
+              <div class="gemini-head"><b>Gemini AI 判讀</b><span id="geminiStatus" class="s2-observation-count">連線中</span></div>
+              <p class="s2-small">以本頁案件參數＋Sentinel-2／SAR 監測摘要＋異常通報為依據，由 Google Gemini 2.5 Flash（免費額度，每日上限 60 次）產生判讀；問題請輸入於上方「提問內容」。免費方案的輸入內容可能被 Google 用於改善服務，請勿輸入個資或機敏資料。</p>
+              <button id="generateGemini" type="button" disabled>Gemini AI 判讀</button>
+              <form id="geminiKeyForm" class="s2-mail-form" hidden autocomplete="off">
+                <label>Gemini API 金鑰<input id="geminiKey" type="password" autocomplete="off" placeholder="於 Google AI Studio 建立" /></label>
+                <label>權限密碼<input id="geminiPass" type="password" autocomplete="off" /></label>
+                <div class="s2-mail-actions"><button type="submit">設定金鑰</button></div>
+                <div id="geminiKeyResult" class="s2-mail-result"></div>
+              </form>
             </div>
             <article id="aiReply" class="ai-reply"></article>
           </div>
@@ -698,6 +766,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260927-s2fix"></script>
+    <script src="./app.js?v=20260927-s2v4"></script>
   </body>
 </html>
