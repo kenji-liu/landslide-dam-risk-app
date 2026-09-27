@@ -2559,50 +2559,6 @@ function s2RenderOverview(m, index) {
         : `<p class="muted-empty">本月無需關注的新增水體。</p>`) + routineNote;
 }
 
-// ---- 與簡報數字統一對照 ----
-function s2DiffCell(d, unit) {
-  if (d == null) return `<td class="num muted">—</td>`;
-  const a = Math.abs(d);
-  const tone = unit === "%" ? (a <= 1.5 ? "good" : a <= 4 ? "warn" : "bad") : (a <= 3.5 ? "good" : a <= 10 ? "warn" : "bad");
-  return `<td class="num diff ${tone}">${d > 0 ? "+" : ""}${d.toFixed(1)}</td>`;
-}
-
-function s2RenderComparison() {
-  const cmp = s2State.data.slide_comparison;
-  const box = document.querySelector("#s2Comparison");
-  if (!box) return;
-  if (!cmp) { box.innerHTML = `<p class="muted-empty">尚無對照資料。</p>`; return; }
-  const covTxt = (c) => (c == null ? "" : `<small>覆蓋${Math.round(c * 100)}%</small>`);
-  const body = cmp.rows.map((r) => cmp.metrics.map((mt, j) => {
-    const v = r.metrics[mt.key];
-    const i = s2Months().findIndex((m) => m.month === r.date.slice(0, 7));
-    const head = j === 0 ? `<td rowspan="${cmp.metrics.length}" class="s2-cmp-date"><button type="button" class="linkish" data-s2-index="${i}">${r.roc_date}</button><small>${r.phase}</small></td>` : "";
-    return `<tr class="${j === 0 ? "grp" : ""}">${head}<td>${mt.label}</td>
-      <td class="num">${v.slide_is_minimum ? "≥" : ""}${v.slide}${mt.unit === "ha" ? " ha" : ""}</td>
-      <td class="num">${v.scene ?? "—"}${covTxt(v.scene_coverage)}</td>${s2DiffCell(v.scene_diff, mt.unit)}
-      <td class="num">${v.month ?? "—"}${covTxt(v.month_coverage)}</td>${s2DiffCell(v.month_diff, mt.unit)}</tr>`;
-  }).join("")).join("");
-  const o = cmp.outline;
-  box.innerHTML = `<div class="s2-cmp-grid">
-    <div class="s2-cmp-table-wrap">
-      <p class="s2-cmp-summary">${cmp.summary}</p>
-      <table class="s2-cmp-table"><thead><tr><th>日期／期別</th><th>指標</th><th>簡報值</th><th>本系統同日單景</th><th>差距</th><th>本系統當月月合成</th><th>差距</th></tr></thead><tbody>${body}</tbody></table>
-      <p class="s2-small">差距＝本系統−簡報值；綠色 ≤1.5 個百分點（水域 ≤3.5 ha）、黃色 ≤4、紅色 &gt;4。同日單景採用與逐月序列相同的區域輪廓與去雲規則；月合成為當月全部影像中位數，本來就會與單日影像不同。<a href="./assets/sentinel2/slide_comparison.csv" download>下載對照表 CSV</a></p>
-    </div>
-    <div class="s2-cmp-outline">
-      <figure class="s2-zoomable s2-static-fig" data-s2-zoom="verify" tabindex="0" role="button" aria-label="放大輪廓校核圖">
-        <img src="${o.figure}" alt="崩積區與殘壩區輪廓校核圖" loading="lazy" />
-        <figcaption>輪廓校核：青色＝本系統，橘／桃紅＝簡報原圖<span class="s2-zoom-hint">⤢</span></figcaption>
-      </figure>
-      <ul class="s2-outline-facts">
-        <li>崩積區 <b>${o.debris_ha} ha</b>、殘壩區 <b>${o.residual_ha} ha</b>，合計 <b>${o.r1_total_ha} ha</b>（${o.r1_reference}）</li>
-        <li>與前版輪廓 IoU：崩積區 ${o.iou_vs_v1.debris}、殘壩區 ${o.iou_vs_v1.residual}，最大邊界差 ≤${o.max_boundary_diff_m} m</li>
-        <li>${o.method}</li>
-      </ul>
-    </div>
-  </div>`;
-}
-
 // ---- 點選放大檢視 ----
 const s2Zoom = { layer: null, scale: 1, x: 0, y: 0, drag: null, kind: "map" };
 
@@ -2703,11 +2659,6 @@ function s2RenderLightbox() {
     layersBox.innerHTML = Object.entries(s2Layers).map(([k, v]) =>
       `<button type="button" data-lb-layer="${k}" class="${k === s2Zoom.layer ? "active" : ""}">${v.label}</button>`).join("");
     canvas.innerHTML = s2FigureSvg(s2Zoom.layer, m, { labels: true, stamp: true });
-  } else if (s2Zoom.kind === "verify") {
-    lb.querySelector("#s2LbTitle").textContent = "崩積區／殘壩區輪廓校核（簡報圖3-29 全15面板）";
-    lb.querySelector("#s2LbSub").textContent = "青色＝本系統投票輪廓；橘／桃紅＝簡報原圖";
-    layersBox.innerHTML = "";
-    canvas.innerHTML = `<img src="${s2State.data.slide_comparison.outline.figure}" alt="輪廓校核圖" draggable="false" />`;
   } else {
     const src = document.querySelector(s2Zoom.kind === "chart-trend" ? "#s2TrendChart" : "#s2WaterChart");
     lb.querySelector("#s2LbTitle").textContent = src.querySelector(".s2-chart-title strong")?.textContent || "圖表";
@@ -2718,7 +2669,6 @@ function s2RenderLightbox() {
   // 依圖幅長寬比設定畫布寬度，讓整張圖剛好塞進視窗
   let aspect = 1.32;
   if (s2Zoom.kind === "map") aspect = (s2Layers[s2Zoom.layer].extent === "view" ? s2State.data.view : s2State.data.overview).aspect;
-  else if (s2Zoom.kind === "verify") aspect = 1878 / 2503;
   else { const vb = canvas.querySelector("svg")?.viewBox?.baseVal; if (vb) aspect = vb.width / vb.height; }
   canvas.style.width = `min(96vw, calc((100vh - 130px) * ${aspect.toFixed(4)}))`;
   s2ApplyZoom();
@@ -2902,11 +2852,9 @@ async function initSentinel2() {
     document.querySelector("#s2MethodBare").textContent = `${data.method.composite}${data.method.bare}`;
     document.querySelector("#s2DerivedNote").textContent = data.derived_note;
     document.querySelector("#s2MethodWater").textContent = `${data.method.water}${data.method.new_water}`;
-    document.querySelector("#s2MethodCalib").textContent = data.method.calibration;
     document.querySelector("#s2Limitations").textContent = `${data.limitations}${data.period.note}`;
     document.querySelector("#s2Source").textContent = `資料來源：${data.source}｜資料更新：${data.updated_at}`;
     renderSentinel2View();
-    s2RenderComparison();
   } catch (error) {
     document.querySelector("#s2ImagePanels").innerHTML = `<p class="muted-empty">Sentinel-2資料載入失敗：${error.message}</p>`;
   }
