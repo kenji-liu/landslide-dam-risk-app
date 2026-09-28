@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260928-s2v8-terrain3d" />
+    <link rel="stylesheet" href="./styles.css?v=20260928-gis1b" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -300,7 +300,7 @@
         <div class="toolbar-card">
           <div>
             <h2>空間研判</h2>
-            <p>套疊真實衛星影像後圈繪崩塌與壩體範圍，依專家量測準則推估 AL、VL、VD、HDmin、WD、LDTop 與 S。</p>
+            <p>套疊 Esri 高解析衛星影像與本平台 Sentinel-2 月監測圖層圈繪崩塌與壩體範圍，高程取自 UAV 實測 DSM（與 3D 模型同一資料），依專家量測準則推估 AL、VL、VD、HDmin、WD、LDTop 與 S。</p>
           </div>
           <div class="toolbar-actions">
             <button id="focusMatayan" class="outline" type="button">定位馬太鞍案例</button>
@@ -359,6 +359,45 @@
                 </div>
               </div>
             </div>
+            <div class="gis-s2-tools">
+              <strong>Sentinel-2 月監測圖層（本平台每月產製，與 Sentinel-2 頁同步）</strong>
+              <div class="gis-s2-month">
+                <button type="button" class="outline" data-gis-step="-1" title="上一個月">‹ 上個月</button>
+                <span id="gisS2Month">載入中</span>
+                <button type="button" class="outline" data-gis-step="1" title="下一個月">下個月 ›</button>
+              </div>
+              <label>疊合圖層
+                <select id="gisS2Layer">
+                  <option value="">不顯示（只看 Esri 衛星底圖）</option>
+                  <option value="tc" selected>Sentinel-2 真色</option>
+                  <option value="ndvi">NDVI 裸露／植生</option>
+                  <option value="zanom">植生變化：與往年同月比</option>
+                  <option value="dprev">植生變化：與上個月比</option>
+                  <option value="recovery">崩積區植物恢復分區</option>
+                  <option value="ndwi">NDWI 水域</option>
+                </select>
+              </label>
+              <label class="s2-blend">透明<input id="gisS2Opacity" type="range" min="0" max="100" step="5" value="70" aria-label="Sentinel-2 圖層不透明度" />不透明</label>
+              <div class="gis-s2-checks">
+                <label><input type="checkbox" id="gisS2Outlines" checked />崩積區／殘壩區／湖域／下游輪廓</label>
+                <label><input type="checkbox" id="gisS2Marks" checked />本月疑似新崩塌／新增裸露點</label>
+              </div>
+              <div class="gis-s2-actions">
+                <button type="button" data-gis-auto="bare">以本月裸露範圍圈繪崩塌 AL</button>
+                <button type="button" class="outline" data-gis-auto="residual">以殘壩區輪廓作壩體足跡</button>
+                <button type="button" class="outline" data-gis-auto="water">以本月水域圈繪湖面（參考）</button>
+              </div>
+              <p id="gisS2Note" class="s2-small"></p>
+            </div>
+            <label>高程資料來源
+              <select id="elevationSource">
+                <option value="auto" selected>自動（壩頂取災後 UAV DSM；河床與坡降取災前 DEM）</option>
+                <option value="uav0930">UAV 實測 DSM 2025-09-30（5 m）</option>
+                <option value="uav0920">UAV 實測 DSM 2025-09-20（5 m）</option>
+                <option value="cop30">災前 Copernicus DEM（30 m，2011–2015）</option>
+                <option value="glo90">公開 DEM GLO-90（Open-Meteo，90 m）</option>
+              </select>
+            </label>
             <label>高程套用目標
               <select id="elevationTarget">
                 <option value="crestElevation">壩頂/溢流點高程</option>
@@ -782,6 +821,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260928-s2v8-terrain3d"></script>
+    <script src="./app.js?v=20260928-gis1b"></script>
   </body>
 </html>

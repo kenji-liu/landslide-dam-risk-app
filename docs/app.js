@@ -778,7 +778,8 @@ async function handleElevationClick(latlng) {
   const targetLabel = elevationTargetLabels[target] || "高程欄位";
   setMapStatus(`正在查詢 ${targetLabel} 高程...`);
   try {
-    const elevation = await lookupElevation(latlng);
+    const detail = await lookupElevationDetail(latlng, target);
+    const elevation = detail.value;
     const input = document.querySelector(`#${target}`);
     if (input) input.value = elevation.toFixed(1);
     spatialState.result.lastElevation = elevation;
@@ -796,7 +797,8 @@ async function handleElevationClick(latlng) {
       <div class="spatial-popup">
         <b>${targetLabel}</b>
         <span>${valueLabel}</span>
-        <span>資料源：Open-Meteo Copernicus DEM GLO-90，供緊急概估。</span>
+        <span>採用：${detail.label}</span>
+        ${dsmDetailHtml(detail)}
       </div>
     `).openPopup();
     addDrawnFeature({ mode: "elevationPoint", label: targetLabel, valueLabel, layer: marker, color: meta.color });
@@ -829,7 +831,7 @@ function setMeasurementMode(mode) {
   });
   const meta = measureMeta[mode];
   const message = meta.type === "point"
-    ? `${meta.label}：先選擇高程套用目標，再點擊地圖，系統會以公開 DEM 概估高程。`
+    ? `${meta.label}：先選擇高程套用目標，再點擊地圖；高程取自 UAV 實測 DSM／災前 DEM（依「高程資料來源」）。`
     : `${meta.label}：在衛星影像上連續點選，完成後按「完成量測」。`;
   setMapStatus(message);
   renderMapLegend();
@@ -945,6 +947,7 @@ function initSpatialMap() {
   updateCopernicusLinks();
   setMeasurementMode("landslide");
   initSentinelHubPanel();
+  setTimeout(gisS2Init, 0);        // 等整支程式載入完成（gisS2 等宣告在檔案後段）
 }
 
 function tagClass(level) {
@@ -2996,6 +2999,7 @@ function renderSentinel2View() {
   document.querySelector("#s2WaterChart").innerHTML = s2WaterChart(index);
   s2RenderOverview(m, index);
   s2RenderAnomaly(m);
+  if (typeof gisS2Render === "function") gisS2Render();
 
   document.querySelectorAll("[data-s2-metric]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -3728,3 +3732,274 @@ window.addEventListener('hashchange', () => {
   if (pageTitles[location.hash.slice(1)]) showPage(location.hash.slice(1));
 });
 selectTerrainMetadata('matayan_20250930').catch(error => console.warn(error.message));
+
+
+// ================================================================ 空間研判連動：Sentinel-2 月圖層、自動圈繪、實測 DSM 高程
+var gisS2 = { overlay: null, outlines: null, marks: null, regions: null, vec: {}, opacity: 0.7, pane: null };
+
+// 仿射貼圖：Sentinel-2 影像為 UTM 網格，與 Web Mercator 底圖有約 0.7° 旋轉；以左上、右上、左下三角經緯度精確貼合
+const GisAffineOverlay = window.L ? L.ImageOverlay.extend({
+  initialize(url, corners, options) {
+    this._corners = corners.map((c) => L.latLng(c[0], c[1]));
+    const [tl, tr, bl] = this._corners;
+    const br = L.latLng(tr.lat + bl.lat - tl.lat, tr.lng + bl.lng - tl.lng);
+    L.ImageOverlay.prototype.initialize.call(this, url, L.latLngBounds([tl, tr, bl, br]), options);
+  },
+  onAdd(map) {
+    L.ImageOverlay.prototype.onAdd.call(this, map);
+    this._image.style.transformOrigin = "0 0";
+    this._image.addEventListener("load", () => this._map && this._reset());
+  },
+  _applyMatrix(pts) {
+    const img = this._image;
+    if (!img || !img.naturalWidth) return;
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const [tl, tr, bl] = pts;
+    img.style.width = `${w}px`;
+    img.style.height = `${h}px`;
+    img.style.transform = `matrix(${(tr.x - tl.x) / w},${(tr.y - tl.y) / w},${(bl.x - tl.x) / h},${(bl.y - tl.y) / h},${tl.x},${tl.y})`;
+  },
+  _reset() {
+    if (this._map) this._applyMatrix(this._corners.map((c) => this._map.latLngToLayerPoint(c)));
+  },
+  _animateZoom(e) {
+    this._applyMatrix(this._corners.map((c) => this._map._latLngToNewLayerPoint(c, e.zoom, e.center)));
+  }
+}) : null;
+
+const GIS_REGION_STYLE = {
+  watershed: { color: "#e2e8f0", weight: 1.5, dashArray: "6 5", label: "馬太鞍溪集水區" },
+  downstream_all: { color: "#60a5fa", weight: 2, dashArray: "6 5", label: "下游河道區" },
+  lake_max: { color: "#22d3ee", weight: 2, dashArray: "4 4", label: "2025 堰塞湖最大範圍" },
+  debris: { color: "#f59e0b", weight: 2.5, label: "崩積區" },
+  residual: { color: "#ec4899", weight: 2.5, label: "殘壩區" }
+};
+const GIS_LAYER_NOTE = {
+  tc: "Sentinel-2 當月去雲合成真色（10 m）；可拉透明度與 Esri 高解析影像比對崩塌邊界。",
+  ndvi: "褐色＝裸露（NDVI < 0.25）、綠色＝植生。",
+  zanom: "紅＝植物比往年同月少、綠＝比往年多（2019–2024 同月份基準）。",
+  dprev: "紅＝比上個月植物少、綠＝比上個月多。",
+  recovery: "綠＝已自然長回、黃＝緩慢恢復、紅＝仍裸露（建議評估人工植生）。",
+  ndwi: "深藍＝判釋水域。"
+};
+
+async function gisLoadRegions() {
+  if (!gisS2.regions) {
+    const r = await fetch("./assets/sentinel2/regions_wgs84.geojson");
+    if (!r.ok) throw new Error("區域輪廓載入失敗");
+    gisS2.regions = await r.json();
+  }
+  return gisS2.regions;
+}
+
+async function gisLoadVec(m) {
+  if (!m?.images?.vec) return null;
+  if (!gisS2.vec[m.month]) {
+    const r = await fetch(m.images.vec);
+    gisS2.vec[m.month] = r.ok ? await r.json() : null;
+  }
+  return gisS2.vec[m.month];
+}
+
+function gisS2Init() {
+  const map = spatialState.map;
+  if (!map || gisS2.pane) return;
+  gisS2.pane = map.createPane("gisS2Pane");
+  gisS2.pane.style.zIndex = 350;              // 在 Esri 底圖之上、圈繪圖形之下
+  gisS2.pane.style.pointerEvents = "none";
+  map.createPane("gisRefPane").style.zIndex = 390;
+  map.getPane("gisRefPane").style.pointerEvents = "none";
+  document.querySelector("#gisS2Layer")?.addEventListener("change", gisS2Render);
+  document.querySelector("#gisS2Outlines")?.addEventListener("change", gisS2Render);
+  document.querySelector("#gisS2Marks")?.addEventListener("change", gisS2Render);
+  document.querySelector("#gisS2Opacity")?.addEventListener("input", (e) => {
+    gisS2.opacity = Number(e.target.value) / 100;
+    if (gisS2.overlay) gisS2.overlay.setOpacity(gisS2.opacity);
+  });
+  document.querySelectorAll("[data-gis-step]").forEach((b) => b.addEventListener("click", () => {
+    if (!s2State.data) return;
+    selectS2Observation(s2State.index + Number(b.dataset.gisStep));      // 同步 Sentinel-2 頁
+  }));
+  document.querySelectorAll("[data-gis-auto]").forEach((b) => b.addEventListener("click", () => gisAutoDraw(b.dataset.gisAuto)));
+  gisS2Render();
+}
+
+async function gisS2Render() {
+  const map = spatialState.map;
+  const label = document.querySelector("#gisS2Month");
+  if (!map || !label || !gisS2.pane) return;
+  if (!s2State.data) { label.textContent = "Sentinel-2 資料載入中…"; return; }
+  const m = s2Months()[s2State.index];
+  const months = s2Months();
+  label.textContent = `${m.roc_month}（${m.month}）${m.final ? "" : "暫定"}`;
+  document.querySelectorAll("[data-gis-step]").forEach((b) => {
+    const i = s2State.index + Number(b.dataset.gisStep);
+    b.disabled = i < 0 || i >= months.length;
+  });
+  // 影像
+  if (gisS2.overlay) { map.removeLayer(gisS2.overlay); gisS2.overlay = null; }
+  const layer = document.querySelector("#gisS2Layer").value;
+  const url = layer && m.images?.[layer];
+  const scenes = m.scenes || [];
+  const notes = [];
+  if (layer && !url) notes.push(`${m.roc_month} 沒有此圖層（整月雲遮或資料不足），請切換月份。`);
+  if (url && GisAffineOverlay) {
+    gisS2.overlay = new GisAffineOverlay(url, s2State.data.view.corners_ll, { opacity: gisS2.opacity, interactive: false, pane: "gisS2Pane" }).addTo(map);
+    notes.push(`${GIS_LAYER_NOTE[layer] || ""}影像日期：${scenes.map((x) => x.date.slice(5).replace("-", "/")).join("、") || "—"}；白色＝雲遮。`);
+  }
+  // 區域輪廓
+  if (gisS2.outlines) { map.removeLayer(gisS2.outlines); gisS2.outlines = null; }
+  if (document.querySelector("#gisS2Outlines").checked) {
+    try {
+      const reg = await gisLoadRegions();
+      gisS2.outlines = L.geoJSON(reg, {
+        pane: "gisRefPane",
+        interactive: false,
+        filter: (f) => !!GIS_REGION_STYLE[f.properties.id],
+        style: (f) => ({ ...GIS_REGION_STYLE[f.properties.id], fill: false })
+      }).addTo(map);
+      notes.push("輪廓：橘＝崩積區、桃紅＝殘壩區、青虛線＝2025 湖域最大範圍、藍虛線＝下游河道區。");
+    } catch (e) { notes.push(e.message); }
+  }
+  // 本月候選點（與 Sentinel-2 頁清單同編號）
+  if (gisS2.marks) { map.removeLayer(gisS2.marks); gisS2.marks = null; }
+  if (document.querySelector("#gisS2Marks").checked) {
+    const pts = [];
+    (m.ndvi_anomaly?.candidates || []).forEach((c, i) => {
+      if (["new", "new_pending", "persisting"].includes(c.class)) pts.push({ ...c, tag: `往年比 #${i + 1}`, color: s2AnomClass[c.class]?.color || "#dc2626" });
+    });
+    (m.mom?.blocks || []).forEach((b, i) => {
+      if (b.class === "new_bare" || b.class === "uncertain") pts.push({ ...b, tag: `上月比 #${i + 1}`, color: s2AnomClass[b.class]?.color || "#dc2626" });
+    });
+    gisS2.marks = L.layerGroup(pts.map((f) => L.circleMarker([f.lat, f.lon], { pane: "gisRefPane", radius: 10, color: f.color, weight: 3, fill: false, interactive: false })
+      .bindTooltip(`${f.tag}｜${s2AnomClass[f.class]?.label || f.class} ${f.area_ha} ha`, { permanent: true, direction: "right", className: "gis-s2-tip" }))).addTo(map);
+    if (pts.length) notes.push(`本月標記 ${pts.length} 處（編號同 Sentinel-2 頁清單）。`);
+  }
+  document.querySelector("#gisS2Note").textContent = notes.join(" ");
+}
+
+async function gisAutoDraw(kind) {
+  const map = spatialState.map;
+  if (!map || !s2State.data) return;
+  const m = s2Months()[s2State.index];
+  let feature = null;
+  try {
+    if (kind === "residual") feature = (await gisLoadRegions()).features.find((f) => f.properties.id === "residual");
+    else feature = (await gisLoadVec(m))?.features.find((f) => f.properties.kind === (kind === "bare" ? "bare_slide" : "water"));
+  } catch (e) { setMapStatus(`載入失敗：${e.message}`); return; }
+  if (!feature) {
+    setMapStatus(`${m.roc_month} 沒有可用的${kind === "water" ? "水域" : "裸露"}範圍（雲遮或無影像），請切換月份。`);
+    return;
+  }
+  const mode = { bare: "landslide", residual: "damFootprint", water: "lakeRef" }[kind];
+  const meta = measureMeta[mode] || { label: "壩區水域（參考）", color: "#0891b2" };
+  const area = feature.properties.area_ha * 1e4;
+  spatialState.drawnLayers.filter((f) => f.auto === kind).forEach((f) => map.removeLayer(f.layer));
+  spatialState.drawnLayers = spatialState.drawnLayers.filter((f) => f.auto !== kind);
+  const layer = L.geoJSON(feature, { interactive: false, style: { color: meta.color, weight: 2.5, fillColor: meta.color, fillOpacity: 0.22 } }).addTo(map);
+  const source = kind === "residual" ? "殘壩區輪廓（簡報圖3-29 多期判釋）" : `Sentinel-2 ${m.roc_month} ${kind === "bare" ? "裸露（NDVI < 0.25，崩積區外擴 300 m，扣殘壩區與湖域）" : "壩區水域（MNDWI）"}`;
+  const valueLabel = `${fmtCompact(area, 0, " m²")}（${feature.properties.area_ha} ha）`;
+  layer.bindPopup(`<div class="spatial-popup"><b>${meta.label}（自動圈繪）</b><span>${valueLabel}</span><span>來源：${source}</span><span>10 m 解析度初圈，請以 Esri 高解析影像或 UAV 正射檢核邊界；需要修正時可改用手動圈繪覆蓋。</span></div>`);
+  const feat = addDrawnFeature({ mode, label: `${meta.label}｜${kind === "residual" ? "殘壩區輪廓" : `S2 ${m.roc_month}`}`, valueLabel, layer, color: meta.color });
+  feat.auto = kind;
+  if (mode === "landslide") spatialState.result.landslideArea = area;
+  if (mode === "damFootprint") spatialState.result.damFootprintArea = area;
+  if (mode === "lakeRef") spatialState.result.lakeArea = area;
+  map.fitBounds(layer.getBounds(), { padding: [24, 24], maxZoom: 16 });
+  renderSpatialResults();
+  if (mode !== "lakeRef") autoImportSpatialEstimates(`已由${source}自動圈繪 ${meta.label} ${valueLabel}，`);
+  else setMapStatus(`已圈繪本月壩區水域 ${valueLabel}（參考；湖面積與庫容請於「庫容剖面」頁檢核）。`);
+}
+
+// ---------------------------------------------------------------- 實測 DSM 高程（與 3D 模型同一資料）
+const DSM_SOURCES = {
+  uav0930: { file: "matayan_20250930_dsm.tif", label: "UAV 實測 DSM 2025-09-30（5 m）", short: "09/30 UAV" },
+  uav0920: { file: "matayan_20250920_dsm.tif", label: "UAV 實測 DSM 2025-09-20（5 m）", short: "09/20 UAV" },
+  cop30: { file: "matayan_cop30_dsm.tif", label: "災前 Copernicus DEM（30 m，2011–2015）", short: "災前 DEM" }
+};
+const TWD97_TM2 = "+proj=tmerc +lat_0=0 +lon_0=121 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
+var dsmState = { rasters: {}, loading: null };
+
+function gisLoadScript(src) {
+  return new Promise((resolve, reject) => {
+    if ([...document.scripts].some((x) => x.src === src)) { resolve(); return; }
+    const el = document.createElement("script");
+    el.src = src;
+    el.onload = resolve;
+    el.onerror = () => reject(new Error(`無法載入 ${src}`));
+    document.head.appendChild(el);
+  });
+}
+
+function dsmReady() {
+  if (!dsmState.loading) {
+    dsmState.loading = (async () => {
+      await gisLoadScript("https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js");
+      await gisLoadScript("https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js");
+      await Promise.all(Object.entries(DSM_SOURCES).map(async ([id, src]) => {
+        try {
+          const buf = await (await fetch(`./assets/models/${src.file}`)).arrayBuffer();
+          const img = await (await GeoTIFF.fromArrayBuffer(buf)).getImage();
+          const [data] = await img.readRasters();
+          dsmState.rasters[id] = { data, w: img.getWidth(), h: img.getHeight(), bbox: img.getBoundingBox(), nodata: img.getGDALNoData() };
+        } catch (e) { console.warn("DSM 載入失敗", id, e); }
+      }));
+    })().catch((e) => { dsmState.loading = null; throw e; });
+  }
+  return dsmState.loading;
+}
+
+function dsmToTm(lat, lng) {
+  return proj4("EPSG:4326", TWD97_TM2, [lng, lat]);
+}
+
+function dsmSample(id, E, N) {
+  const r = dsmState.rasters[id];
+  if (!r) return null;
+  const [x0, y0, x1, y1] = r.bbox;
+  const fx = (E - x0) / ((x1 - x0) / r.w) - 0.5;
+  const fy = (y1 - N) / ((y1 - y0) / r.h) - 0.5;
+  const i = Math.floor(fx);
+  const j = Math.floor(fy);
+  if (i < 0 || j < 0 || i + 1 >= r.w || j + 1 >= r.h) return null;
+  const at = (a, b) => {
+    const z = r.data[b * r.w + a];
+    return !Number.isFinite(z) || z < -1000 || (r.nodata != null && Math.abs(z - r.nodata) < 1e-3) ? null : z;
+  };
+  const q = [at(i, j), at(i + 1, j), at(i, j + 1), at(i + 1, j + 1)];
+  if (q.some((z) => z == null)) return at(Math.round(fx), Math.round(fy));
+  const tx = fx - i;
+  const ty = fy - j;
+  return q[0] * (1 - tx) * (1 - ty) + q[1] * tx * (1 - ty) + q[2] * (1 - tx) * ty + q[3] * tx * ty;
+}
+
+async function lookupElevationDetail(latlng, target) {
+  const vals = {};
+  let note = "";
+  try {
+    await dsmReady();
+    const [E, N] = dsmToTm(latlng.lat, latlng.lng);
+    Object.keys(DSM_SOURCES).forEach((id) => { vals[id] = dsmSample(id, E, N); });
+  } catch (e) { note = `DSM 無法載入（${e.message}），改用公開 DEM。`; }
+  const pref = document.querySelector("#elevationSource")?.value || "auto";
+  const preTargets = ["riverbedElevation", "slopeUpElevation", "slopeDownElevation"];
+  const order = pref === "auto" ? (preTargets.includes(target) ? ["cop30", "uav0930", "uav0920"] : ["uav0930", "uav0920", "cop30"])
+    : (DSM_SOURCES[pref] ? [pref] : []);
+  let used = order.find((id) => vals[id] != null);
+  let value = used ? vals[used] : null;
+  let label = used ? DSM_SOURCES[used].label : "";
+  if (value == null) {
+    value = await lookupElevation(latlng);
+    used = "glo90";
+    label = "公開 DEM GLO-90（Open-Meteo，90 m；此點不在 UAV DSM 範圍內或選擇此來源）";
+  }
+  return { value, used, label, vals, note };
+}
+
+function dsmDetailHtml(d) {
+  const rows = Object.entries(DSM_SOURCES).map(([id, s]) => `<span>${s.short}：${d.vals[id] == null ? "範圍外" : `${d.vals[id].toFixed(1)} m`}</span>`).join("");
+  const post = d.vals.uav0930 ?? d.vals.uav0920;
+  const diff = post != null && d.vals.cop30 != null ? post - d.vals.cop30 : null;
+  return `${rows}${diff == null ? "" : `<span><b>災後 − 災前：${diff >= 0 ? "+" : ""}${diff.toFixed(1)} m</b>（${diff >= 0 ? "堆積／抬升" : "剝蝕／下降"}；災前 DEM 含樹冠，林地差值偏小約 10–20 m）</span>`}${d.note ? `<span>${d.note}</span>` : ""}`;
+}
