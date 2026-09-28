@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260928-gis2" />
+    <link rel="stylesheet" href="./styles.css?v=20260928-gis3" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -241,7 +241,9 @@
             <iframe id="terrainFrame" class="terrain-frame" title="馬太鞍溪互動三維 DSM 模型" data-src="./terrain-viewer.html?embed=1" allow="fullscreen" allowfullscreen></iframe>
             <noscript><a href="./terrain-viewer.html">開啟三維地形檢視器</a></noscript>
           </article>
-          <div class="model3d-metadata-layout"><article class="module-card"><div id="model3dSummary" class="model3d-summary"></div></article>
+          <div class="model3d-metadata-layout"><article class="module-card model3d-link"><h3>3D ↔ 空間研判連動</h3>
+            <div id="model3dPick"><p class="s2-small">在 3D 模型上點選地表，可把該點高程帶入空間研判（壩頂、原河床、上下游河床）；空間研判的崩積區、殘壩區、圈繪圖形與本月候選點會自動套疊在 3D 地形上。</p></div></article>
+          <article class="module-card"><div id="model3dSummary" class="model3d-summary"></div></article>
           <details class="module-card model3d-form-card">
             <summary>模型資料登錄（隨觀測資料切換）</summary>
             <div class="model3d-form">
@@ -824,6 +826,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260928-gis2"></script>
+    <script src="./app.js?v=20260928-gis3"></script>
   </body>
 </html>

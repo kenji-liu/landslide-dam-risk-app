@@ -2626,3 +2626,9 @@ body.s2-lb-open { overflow: hidden; }
 .dem-actions button { font-size: 12.5px; padding: 6px 8px; }
 .dem-profile { width: 100%; height: auto; background: #fff; border: 1px solid #dde6ea; border-radius: 8px; }
 .dem-profile text { font-size: 11px; fill: #4b5f6e; }
+
+/* ---- 3D 連動 ---- */
+.model3d-link h3 { margin: 0 0 8px; font-size: 15px; color: #16303f; }
+.model3d-link p { margin: 4px 0; }
+.spatial-popup .go3d { margin-top: 6px; font-size: 12px; padding: 4px 8px; }
+.s2-row-acts { display: flex; gap: 4px; }

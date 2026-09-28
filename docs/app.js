@@ -85,8 +85,10 @@ window.addEventListener('message', event => {
     frame.style.height = `${Math.max(500, Math.min(2200, event.data.height + 2))}px`;
     return;
   }
+  if (event.data?.type === 'terrain-pick') { gis3dOnPick(event.data); return; }
   if (event.data?.type !== 'terrain-model-selected') return;
   selectTerrainMetadata(event.data.id).catch(error => console.warn(error.message));
+  gis3dOnModel(event.data.id);
 });
 
 function escapeModelText(value) {
@@ -678,6 +680,7 @@ function addDrawnFeature({ mode, label, valueLabel, layer, color }) {
     color
   };
   spatialState.drawnLayers.push(feature);
+  if (typeof gis3dSchedule === "function") gis3dSchedule();
   layer.on("click", () => {
     spatialState.selectedFeatureId = feature.id;
     if (layer.openPopup) layer.openPopup();
@@ -805,6 +808,7 @@ async function handleElevationClick(latlng) {
         <span>${valueLabel}</span>
         <span>採用：${detail.label}</span>
         ${dsmDetailHtml(detail)}
+        <button type="button" class="outline go3d" data-go3d="${latlng.lat},${latlng.lng}">在 3D 模型查看此點</button>
       </div>
     `).openPopup();
     addDrawnFeature({ mode: "elevationPoint", label: targetLabel, valueLabel, layer: marker, color: meta.color });
@@ -859,6 +863,7 @@ function clearSpatialMeasurements() {
     lastElevation: 0
   };
   spatialState.demOverride = null;
+  if (typeof gis3dSchedule === "function") gis3dSchedule();
   document.querySelector("#demDiffPanel").innerHTML = "";
   document.querySelector("#profilePanel").innerHTML = "";
   renderSpatialResults();
@@ -1351,6 +1356,7 @@ function showPage(pageId) {
   const terrainFrame = document.querySelector('#terrainFrame');
   if (pageId === 'model3d' && terrainFrame && !terrainFrame.getAttribute('src')) terrainFrame.src = terrainFrame.dataset.src;
   terrainFrame?.contentWindow?.postMessage({type: 'terrain-visibility', active: pageId === 'model3d'}, location.origin);
+  if (pageId === 'model3d' && typeof gis3dSchedule === 'function') gis3dSchedule();
   if (pageTitles[pageId] && location.hash !== `#${pageId}`) history.replaceState(null, '', `#${pageId}`);
   if (pageId === "gis" && spatialState.map) {
     setTimeout(() => spatialState.map.invalidateSize(), 120);
@@ -2868,6 +2874,8 @@ document.querySelector("#sentinel2")?.addEventListener("click", (e) => {
   if (mk && mk.closest("#s2AnomFigure")) { s2SelectAnom(Number(mk.dataset.anomI), "map"); return; }
   const zb = e.target.closest("[data-anom-zoom]");
   if (zb) { s2ZoomAnom(Number(zb.dataset.anomZoom)); return; }
+  const gb = e.target.closest("[data-anom-gis]");
+  if (gb) { const f = s2VegList(s2Months()[s2State.index])[Number(gb.dataset.anomGis)]; if (f) gisOpenAt(f.lat, f.lon, s2AnomClass[f.class]?.label); return; }
   const row = e.target.closest("[data-anom-row]");
   if (row) { s2SelectAnom(Number(row.dataset.anomRow), "list"); return; }
   const z = e.target.closest("[data-s2-zoom]");
@@ -3317,7 +3325,7 @@ function s2RenderAnomaly(m) {
         return `<tr class="s2-anom-row${sel === i ? " on" : ""}" data-anom-row="${i}" tabindex="0" title="點選在地圖標示">
           <td><b class="s2-num" style="background:${k.color}">${i + 1}</b></td><td><span class="s2-nw-chip ${k.tone}">${k.label}</span></td>
           <td>${f.area_ha} ha<br><small>${s2Pitch(f.area_ha)}</small></td><td>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}</td>
-          <td><button type="button" class="outline s2-locate" data-anom-zoom="${i}">放大</button></td></tr>`;
+          <td class="s2-row-acts"><button type="button" class="outline s2-locate" data-anom-zoom="${i}">放大</button><button type="button" class="outline s2-locate" data-anom-gis="${i}" title="在空間研判地圖開啟並套疊同月份圖層">空間研判</button></td></tr>`;
       }).join("")}</tbody></table>`
     : `<p class="muted-empty">${emptyList}</p>`;
   const r = m.recovery;
@@ -3432,7 +3440,7 @@ function renderMonitoringNotice() {
         const ll = monLoc(a);
         return `<tr class="mon-row${monState.sel === i ? " on" : ""}" data-mon-row="${i}" tabindex="0"><td><b class="s2-num" style="background:${monColor(a)}">${i + 1}</b></td><td>${s2Esc(a.id)}</td><td>${s2Esc(a.source)}<br><small>${s2Esc(a.type)}</small></td><td>${s2Esc(a.title)}${a.value ? `<br><small>${s2Esc(a.value)}</small>` : ""}</td>
          <td>${s2Esc(a.location)}</td><td>${s2Esc(a.date || "")}</td><td><span class="mon-status ${tone[statusOf(a.id)] || "pending"}">${statusOf(a.id)}</span></td>
-         <td class="mon-acts">${ll ? `<button type="button" class="outline" data-mon-zoom-i="${i}">定位</button>` : ""}<button type="button" class="outline mon-reply" data-mon-id="${s2Esc(a.id)}">回報</button></td></tr>`;
+         <td class="mon-acts">${ll ? `<button type="button" class="outline" data-mon-zoom-i="${i}">定位</button><button type="button" class="outline" data-mon-gis="${i}">空間研判</button>` : ""}<button type="button" class="outline mon-reply" data-mon-id="${s2Esc(a.id)}">回報</button></td></tr>`;
       }).join("")}</tbody></table>`
     : `<p class="muted-empty">目前無 Sentinel-2 新生水域／新生崩塌候選，SAR 亦未達黃色或紅色警戒。</p>`;
   const sel = document.querySelector("#monFbId");
@@ -3530,6 +3538,15 @@ document.querySelector("#report")?.addEventListener("click", (e) => {
   if (mk) { monSelect(Number(mk.dataset.monI), "map"); return; }
   const lz = e.target.closest("[data-mon-zoom-i]");
   if (lz) { monZoom(Number(lz.dataset.monZoomI)); return; }
+  const lg = e.target.closest("[data-mon-gis]");
+  if (lg) {
+    const a = monState.items[Number(lg.dataset.monGis)];
+    const ll = monLoc(a);
+    const mi = s2Months().findIndex((x) => x.month === monState.digest?.month);
+    if (mi >= 0 && mi !== s2State.index) selectS2Observation(mi);
+    if (ll) gisOpenAt(ll.lat, ll.lon, a.title);
+    return;
+  }
   const ly = e.target.closest("[data-mon-layer]");
   if (ly) { if (!ly.disabled) { monState.mapLayer = ly.dataset.monLayer; monRenderMap(); } return; }
   const z = e.target.closest("[data-mon-zoom]");
@@ -4214,3 +4231,143 @@ function demProfilePick(kind) {
   handleSpatialEstimateInput();
   setMapStatus(`已由 DSM 剖面帶入${elevationTargetLabels[target]} ${p.v[id].toFixed(1)} m（${DSM_SOURCES[id].label}）。`);
 }
+
+
+// ---------------------------------------------------------------- 3D 模型連動與跨頁開啟
+const MODEL_TO_DSM = { matayan_20250930: "uav0930", matayan_20250920: "uav0920", matayan_cop30: "cop30" };
+var gis3d = { model: "matayan_20250930", ready: false, pick: null, pendingFocus: null, timer: null };
+
+function gis3dWin() {
+  const f = document.getElementById("terrainFrame");
+  return f && f.getAttribute("src") ? f.contentWindow : null;
+}
+
+function gis3dSchedule() {
+  clearTimeout(gis3d.timer);
+  gis3d.timer = setTimeout(gis3dSendOverlays, 400);
+}
+
+async function gis3dSendOverlays() {
+  const win = gis3dWin();
+  if (!win || !gis3d.ready) return;
+  try { await dsmReady(); } catch (e) { return; }
+  const src = MODEL_TO_DSM[gis3d.model] || "uav0930";
+  const items = [];
+  const addLine = (coords, color) => {            // coords：[[lng, lat], ...]；每 15 m 加密並依模型 DSM 取高程，範圍外斷開
+    let seg = [];
+    const flush = () => { if (seg.length > 1) items.push({ kind: "line", pts: seg, color }); seg = []; };
+    for (let k = 0; k < coords.length; k += 1) {
+      const [e1, n1] = dsmToTm(coords[k][1], coords[k][0]);
+      const [e0, n0] = k ? dsmToTm(coords[k - 1][1], coords[k - 1][0]) : [e1, n1];
+      const steps = k ? Math.max(1, Math.ceil(Math.hypot(e1 - e0, n1 - n0) / 15)) : 1;
+      for (let t = k ? 1 : 0; t <= steps; t += 1) {
+        const e = e0 + (e1 - e0) * (t / steps);
+        const n = n0 + (n1 - n0) * (t / steps);
+        const h = dsmSample(src, e, n);
+        if (h == null) flush(); else seg.push([e, n, h]);
+      }
+    }
+    flush();
+  };
+  const addGeom = (g, color) => {
+    if (!g) return;
+    if (g.type === "Point") {
+      const [e, n] = dsmToTm(g.coordinates[1], g.coordinates[0]);
+      const h = dsmSample(src, e, n);
+      if (h != null) items.push({ kind: "point", pt: [e, n, h], color });
+    } else if (g.type === "LineString") addLine(g.coordinates, color);
+    else if (g.type === "Polygon") g.coordinates.forEach((r) => addLine(r, color));
+    else if (g.type === "MultiPolygon") g.coordinates.forEach((poly) => poly.forEach((r) => addLine(r, color)));
+    else if (g.type === "MultiLineString") g.coordinates.forEach((l) => addLine(l, color));
+  };
+  try {
+    const reg = await gisLoadRegions();
+    reg.features.filter((f) => ["debris", "residual", "lake_max"].includes(f.properties.id))
+      .forEach((f) => addGeom(f.geometry, GIS_REGION_STYLE[f.properties.id].color));
+  } catch (e) { /* 無輪廓 */ }
+  spatialState.drawnLayers.forEach((f) => {
+    const gj = f.layer.toGeoJSON();
+    (gj.type === "FeatureCollection" ? gj.features : [gj]).forEach((ft) => addGeom(ft.geometry, f.color));
+  });
+  const m = s2State.data ? s2Months()[s2State.index] : null;
+  (m?.ndvi_anomaly?.candidates || []).filter((c) => ["new", "new_pending"].includes(c.class))
+    .concat((m?.mom?.blocks || []).filter((b) => b.class === "new_bare"))
+    .forEach((c) => addGeom({ type: "Point", coordinates: [c.lon, c.lat] }, "#ff3b3b"));
+  win.postMessage({ type: "terrain-overlays", items }, location.origin);
+}
+
+function gis3dOnModel(id) {
+  gis3d.model = id;
+  gis3d.ready = true;
+  gis3dSchedule();
+  if (gis3d.pendingFocus) { gis3dWin()?.postMessage({ type: "terrain-focus", ...gis3d.pendingFocus }, location.origin); gis3d.pendingFocus = null; }
+}
+
+async function gis3dFocus(lat, lng) {
+  showPage("model3d");
+  try { await dsmReady(); } catch (e) { return; }
+  const [e, n] = dsmToTm(lat, lng);
+  const h = dsmSample(MODEL_TO_DSM[gis3d.model] || "uav0930", e, n) ?? dsmSample("cop30", e, n);
+  if (h == null) { alert("此點不在 3D 模型範圍內。"); return; }
+  const msg = { e, n, h };
+  if (gis3d.ready) gis3dWin()?.postMessage({ type: "terrain-focus", ...msg }, location.origin);
+  else gis3d.pendingFocus = msg;
+}
+
+async function gis3dOnPick(d) {
+  const box = document.querySelector("#model3dPick");
+  if (!box) return;
+  try { await dsmReady(); } catch (e) { return; }
+  const [lng, lat] = proj4(TWD97_TM2, "EPSG:4326", [d.e, d.n]);
+  const vals = Object.fromEntries(Object.keys(DSM_SOURCES).map((id) => [id, dsmSample(id, d.e, d.n)]));
+  gis3d.pick = { lat, lng, h: d.h, model: d.model, vals };
+  const modelLabel = DSM_SOURCES[MODEL_TO_DSM[d.model]]?.label || d.model;
+  box.innerHTML = `<p><b>3D 點選：H ${d.h.toFixed(1)} m</b>（${s2Esc(modelLabel)}）<br><small>E ${d.e.toFixed(1)}、N ${d.n.toFixed(1)}（TWD97）｜${lat.toFixed(5)}, ${lng.toFixed(5)}</small></p>
+    <p class="s2-small">同一點各期：${Object.entries(DSM_SOURCES).map(([id, s2]) => `${s2.short} ${vals[id] == null ? "範圍外" : `${vals[id].toFixed(1)} m`}`).join("｜")}</p>
+    <div class="dem-actions">
+      ${Object.entries(elevationTargetLabels).map(([k, t]) => `<button type="button" class="outline" data-pick-to="${k}">設為${t}</button>`).join("")}
+      <button type="button" data-pick-to="map">在空間研判地圖顯示</button>
+    </div>`;
+  box.querySelectorAll("[data-pick-to]").forEach((b) => b.addEventListener("click", () => gis3dUsePick(b.dataset.pickTo)));
+}
+
+function gis3dUsePick(target) {
+  const p = gis3d.pick;
+  if (!p) return;
+  if (target === "map") { gisOpenAt(p.lat, p.lng, `3D 點選 H ${p.h.toFixed(1)} m`); return; }
+  const input = document.querySelector(`#${target}`);
+  if (input) input.value = p.h.toFixed(1);
+  if (spatialState.map) {
+    const meta = measureMeta.elevationPoint;
+    const marker = L.circleMarker([p.lat, p.lng], { radius: 7, color: meta.color, fillColor: "#7c3aed", fillOpacity: 0.9, weight: 2, interactive: false }).addTo(spatialState.map);
+    addDrawnFeature({ mode: "elevationPoint", label: `${elevationTargetLabels[target]}（3D 點選）`, valueLabel: `${p.h.toFixed(1)} m`, layer: marker, color: meta.color });
+  }
+  handleSpatialEstimateInput();
+  const box = document.querySelector("#model3dPick");
+  box?.insertAdjacentHTML("beforeend", `<p class="s2-small t-green">已設為${elevationTargetLabels[target]}，並同步更新空間研判與調查參數。</p>`);
+}
+
+function gisOpenAt(lat, lng, label) {
+  showPage("gis");
+  const marks = document.querySelector("#gisS2Marks");
+  if (marks && !marks.checked) marks.checked = true;
+  setTimeout(() => {
+    const map = spatialState.map;
+    if (!map) return;
+    map.invalidateSize();
+    gisS2Render();
+    map.setView([lat, lng], 16);
+    const ring = L.circleMarker([lat, lng], { radius: 18, color: "#facc15", weight: 4, fill: false, interactive: false }).addTo(map);
+    if (label) ring.bindTooltip(label, { permanent: true, direction: "top", className: "gis-s2-tip" }).openTooltip();
+    setTimeout(() => map.removeLayer(ring), 6000);
+    setMapStatus(`已在空間研判開啟：${label || ""}（${lat.toFixed(4)}, ${lng.toFixed(4)}），同月份 Sentinel-2 圖層已套疊。`);
+  }, 180);
+}
+
+document.querySelector("#satelliteMap")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-go3d]");
+  if (!b) return;
+  e.stopPropagation();
+  const [lat, lng] = b.dataset.go3d.split(",").map(Number);
+  gis3dFocus(lat, lng);
+});

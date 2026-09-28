@@ -9,6 +9,7 @@ document.body.classList.toggle('embedded', embedded);
 let manifest, current, terrain, renderer, scene, camera, controls, grid;
 let requestId = 0, controller, mode = 'texture', vertical = 1, pageActive = true;
 let marker, box, span = 3000, firstLoad = true, pendingModelId, contextLost = false, renderRequested = true;
+let overlayGroup = null, pendingFocus = null;     // 評估平台傳入的圈繪套疊與待飛往點位
 const modelBuffers = new Map();
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -52,6 +53,7 @@ function setupRenderer() {
   grid.material.transparent = true; grid.material.opacity = .5; scene.add(grid);
   marker = new THREE.Mesh(new THREE.SphereGeometry(10,16,12), new THREE.MeshBasicMaterial({color:0xffe181,depthTest:false}));
   marker.visible=false; marker.renderOrder=3; scene.add(marker);
+  overlayGroup = new THREE.Group(); overlayGroup.name = 'platform-overlays';
   new ResizeObserver(()=>{
     const width=host.clientWidth, height=host.clientHeight;
     if (!width || !height) return;
@@ -148,6 +150,7 @@ async function loadModel(id) {
     if(terrain){scene.remove(terrain);disposeTerrain(terrain);}
     const reframe=firstLoad || current?.kind!==item.kind;
     terrain=loaded.scene; current=item; terrain.scale.y=vertical;scene.add(terrain);marker.visible=false;
+    terrain.add(overlayGroup);          // 套疊線跟著地形一起套用垂直倍率
     box=new THREE.Box3().setFromObject(terrain);const size=box.getSize(new THREE.Vector3());
     span=Math.max(size.x,size.z,size.y); controls.minDistance=60;controls.maxDistance=span*5;
     if(item.kind==='satellite')mode='height';
@@ -159,6 +162,7 @@ async function loadModel(id) {
     $('readout').textContent='點選模型查看地表高程';
     const hash=`#${item.id}`; if(location.hash!==hash)history.replaceState(null,'',hash);
     if(parent!==window)parent.postMessage({type:'terrain-model-selected',id:item.id},location.origin);
+    if(pendingFocus){focusOn(pendingFocus);pendingFocus=null;}
   }catch(error){
     if(ticket!==requestId || (error.name==='AbortError' && !timedOut))return;
     const reason=timedOut?'連線逾時':error instanceof TypeError?'連線中斷或檔案無法讀取':error.message;
@@ -216,6 +220,34 @@ function sampleHeight(event){
   const e=manifest.origin[0]+hit.point.x,n=manifest.origin[1]-hit.point.z,h=manifest.origin[2]+hit.point.y/vertical;
   $('readout').textContent=`E ${e.toFixed(1)} · N ${n.toFixed(1)} ｜ H ${h.toFixed(1)} m（${current.kind==='uav'?'TWVD2001':'EGM2008'}）`;
   $('readout').dataset.height=h.toFixed(3);
+  if(parent!==window)parent.postMessage({type:'terrain-pick',e,n,h,model:current.id},location.origin);
+}
+
+// 評估平台連動：在地形上畫出崩積區、殘壩區、圈繪圖形與候選點（高程由平台依目前模型的 DSM 取樣）
+function setOverlays(items){
+  if(!overlayGroup)return;
+  overlayGroup.children.slice().forEach(c=>{overlayGroup.remove(c);c.geometry?.dispose();c.material?.dispose();});
+  const toLocal=([e,n,h])=>new THREE.Vector3(e-manifest.origin[0],h-manifest.origin[2]+3,manifest.origin[1]-n);
+  for(const it of items||[]){
+    const color=new THREE.Color(it.color||'#ffffff');
+    if(it.kind==='line'&&it.pts?.length>1){
+      const geo=new THREE.BufferGeometry().setFromPoints(it.pts.map(toLocal));
+      const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color,depthTest:true}));line.renderOrder=2;overlayGroup.add(line);
+    }else if(it.kind==='point'&&it.pt){
+      const dot=new THREE.Mesh(new THREE.SphereGeometry(it.size||9,14,10),new THREE.MeshBasicMaterial({color,depthTest:false}));
+      dot.position.copy(toLocal(it.pt));dot.renderOrder=3;overlayGroup.add(dot);
+    }
+  }
+  renderRequested=true;
+}
+
+function focusOn({e,n,h}){
+  if(!terrain||!manifest){pendingFocus={e,n,h};return;}
+  const p=new THREE.Vector3(e-manifest.origin[0],(h-manifest.origin[2])*vertical,manifest.origin[1]-n);
+  marker.visible=true;marker.position.copy(p);
+  const offset=camera.position.clone().sub(controls.target).setLength(Math.min(span,900));
+  controls.target.copy(p);camera.position.copy(p).add(offset);controls.update();renderRequested=true;
+  $('readout').textContent=`評估平台點位：E ${e.toFixed(1)} · N ${n.toFixed(1)} ｜ H ${h.toFixed(1)} m`;
 }
 
 function rotate(angle){const offset=camera.position.clone().sub(controls.target);offset.applyAxisAngle(new THREE.Vector3(0,1,0),angle);camera.position.copy(controls.target).add(offset);controls.update();}
@@ -251,7 +283,13 @@ $('saveImage').addEventListener('click',()=>{
 });
 $('retry').addEventListener('click',()=>{if(!renderer||!manifest||contextLost)location.reload();else loadModel(pendingModelId || $('dataset').value);});
 $('dismissError').addEventListener('click',()=>{$('loading').hidden=true;});
-window.addEventListener('message',event=>{if(event.origin===location.origin && event.source===parent && event.data?.type==='terrain-visibility'){pageActive=Boolean(event.data.active);renderRequested=true;}});
+window.addEventListener('message',event=>{
+  if(event.origin!==location.origin || event.source!==parent)return;
+  const d=event.data||{};
+  if(d.type==='terrain-visibility'){pageActive=Boolean(d.active);renderRequested=true;}
+  else if(d.type==='terrain-overlays')setOverlays(d.items);
+  else if(d.type==='terrain-focus')focusOn(d);
+});
 if(embedded)new ResizeObserver(()=>{
   parent.postMessage({type:'terrain-viewer-size',height:Math.ceil(document.querySelector('.terrain-app').getBoundingClientRect().height)},location.origin);
 }).observe(document.querySelector('.terrain-app'));
