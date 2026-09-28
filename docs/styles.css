@@ -24,6 +24,15 @@
 .model3d-metadata-layout .model3d-summary { margin-top: 0; border: 0; background: transparent; padding: 0; }
 .model3d-form-card summary { cursor: pointer; font-weight: 700; margin-bottom: 12px; }
 .model3d-quality strong { color: #785d2a; }
+.stereo-candidate-status { margin-top: 16px; padding: 20px 24px; }
+.stereo-candidate-status h3 { margin: 0 0 5px; font-size: 18px; }
+.stereo-candidate-status p { margin: 0; color: var(--muted); }
+.stereo-candidate-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+.stereo-candidate-list > div { display: grid; gap: 5px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #f7fbfd; }
+.stereo-candidate-list strong { color: var(--ink); }
+.stereo-candidate-list span, .stereo-candidate-footnote { font-size: 13px; }
+.stereo-candidate-status a { color: #246e9e; }
+@media (max-width: 800px) { .stereo-candidate-list { grid-template-columns: 1fr; } }
 @media (max-width: 800px) { .model3d-metadata-layout { grid-template-columns: 1fr; } .terrain-frame { height: 940px; } }
 
 * { box-sizing: border-box; }
