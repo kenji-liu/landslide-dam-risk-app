@@ -4504,8 +4504,9 @@ function gisSarRender() {
   if (gisSar.layer) { map.removeLayer(gisSar.layer); gisSar.layer = null; }
   const pts = (typeof monState !== "undefined" && monState.sar?.points) || [];
   if (!document.querySelector("#gisSarPts")?.checked || !pts.length) return;
-  gisSar.layer = L.layerGroup(pts.filter((p) => p.lat && p.lon).map((p) => L.circleMarker([p.lat, p.lon], {
+  const dirs = ["left", "right", "bottom", "top"];                // 三個點相距約 300 m，標籤分開方向避免重疊
+  gisSar.layer = L.layerGroup(pts.filter((p) => p.lat && p.lon).map((p, k) => L.circleMarker([p.lat, p.lon], {
     pane: "gisRefPane", radius: 8, color: "#fff", weight: 2, fillColor: SAR_COLORS[p.level_class] || "#64748b", fillOpacity: 1, interactive: false
-  }).bindTooltip(`SAR ${p.name}｜${p.level}｜${p.latest || ""}`, { permanent: true, direction: "left", className: "gis-s2-tip" }))).addTo(map);
+  }).bindTooltip(`${/^SAR/.test(p.name) ? "" : "SAR "}${p.name}｜${p.level}｜${String(p.latest || "").split(" ")[0]}`, { permanent: true, direction: dirs[k % dirs.length], className: "gis-s2-tip" }))).addTo(map);
 }
 document.querySelector("#gisSarPts")?.addEventListener("change", () => { gisSarRender(); gis3dSchedule(); });
