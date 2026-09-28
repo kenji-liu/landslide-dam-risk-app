@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260928-gis1b" />
+    <link rel="stylesheet" href="./styles.css?v=20260928-gis2" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -413,6 +413,7 @@
               <button type="button" class="outline measure-mode" data-measure-mode="damLength">量測壩長 LDTop</button>
               <button type="button" class="outline measure-mode" data-measure-mode="channelSlope">量測河段長度</button>
               <button type="button" class="outline measure-mode" data-measure-mode="elevationPoint">點選高程</button>
+              <button type="button" class="outline measure-mode" data-measure-mode="profile">繪製 DSM 剖面</button>
             </div>
             <div class="measure-actions">
               <button id="finishMeasurement" type="button">完成量測</button>
@@ -428,6 +429,8 @@
             </div>
             <p class="sync-note">空間量測成果會直接匯入「調查參數」並更新風險演算；按「同步至調查參數」可手動強制同步一次。</p>
             <div id="spatialResults" class="spatial-results"></div>
+            <div id="demDiffPanel" class="dem-panel"></div>
+            <div id="profilePanel" class="dem-panel"></div>
             <div class="spatial-layer-list">
               <h4>已圈繪圖層</h4>
               <div id="drawnLayerList"></div>
@@ -441,7 +444,7 @@
           </article>
           <article>
             <strong>VL 崩塌體積</strong>
-            <p>優先採災前/災後 DEM 差分；緊急階段可用 AL × 平均厚度 TL 初估，並以現地剖面或文獻範圍校核。</p>
+            <p>優先採災前/災後 DEM 差分（本頁「DEM 差分」：崩塌範圍內高程下降的體積，並可反推平均厚度 TL）；緊急階段可用 AL × 平均厚度 TL 初估，並以現地剖面或文獻範圍校核。</p>
           </article>
           <article>
             <strong>VD 壩體體積</strong>
@@ -821,6 +824,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260928-gis1b"></script>
+    <script src="./app.js?v=20260928-gis2"></script>
   </body>
 </html>

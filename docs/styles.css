@@ -2616,3 +2616,13 @@ body.s2-lb-open { overflow: hidden; }
 .gis-s2-actions button { font-size: 13px; padding: 7px 10px; }
 .gis-s2-tip { background: rgba(15, 23, 42, 0.82); color: #fff; border: 0; font-size: 12px; font-weight: 700; padding: 2px 6px; box-shadow: none; }
 .gis-s2-tip::before { display: none; }
+
+/* ---- 空間研判：DEM 差分與剖面 ---- */
+.dem-panel { margin: 10px 0; }
+.dem-panel h4 { margin: 8px 0 6px; font-size: 14px; color: #16303f; }
+.dem-table td, .dem-table th { font-size: 12px; padding: 4px 6px; }
+.dem-src { display: flex; align-items: center; gap: 6px; margin: 6px 0; font-size: 13px; }
+.dem-actions { display: grid; gap: 6px; margin: 6px 0; }
+.dem-actions button { font-size: 12.5px; padding: 6px 8px; }
+.dem-profile { width: 100%; height: auto; background: #fff; border: 1px solid #dde6ea; border-radius: 8px; }
+.dem-profile text { font-size: 11px; fill: #4b5f6e; }

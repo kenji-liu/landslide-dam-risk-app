@@ -113,7 +113,8 @@ const measureMeta = {
   damWidth: { label: "壩寬 WD", type: "line", minPoints: 2, color: "#2f80c2" },
   damLength: { label: "壩長 LDTop", type: "line", minPoints: 2, color: "#3a9b73" },
   channelSlope: { label: "代表河段長度", type: "line", minPoints: 2, color: "#7b6fd6" },
-  elevationPoint: { label: "點選高程", type: "point", minPoints: 1, color: "#0f6e82" }
+  elevationPoint: { label: "點選高程", type: "point", minPoints: 1, color: "#0f6e82" },
+  profile: { label: "DSM 剖面", type: "line", minPoints: 2, color: "#111827" }
 };
 
 const elevationTargetLabels = {
@@ -327,7 +328,8 @@ function fmtLegendValue(mode) {
     damWidth: [spatialState.result.damWidth, 1, "m"],
     damLength: [spatialState.result.damLength, 1, "m"],
     channelSlope: [spatialState.result.channelSlopeDistance, 1, "m"],
-    elevationPoint: [spatialState.result.lastElevation, 1, "m"]
+    elevationPoint: [spatialState.result.lastElevation, 1, "m"],
+    profile: [spatialState.result.profileLength || 0, 1, "m"]
   };
   const [value, digits, unit] = valueMap[mode] || [0, 0, ""];
   return fmtCompact(value, digits, ` ${unit}`);
@@ -624,7 +626,8 @@ function getSpatialEstimates() {
   const HDmin = crestElevation > 0 && riverbedElevation > 0 ? Math.max(0, crestElevation - riverbedElevation) : num("damHeight");
   const VL = AL > 0 && landslideThickness > 0 ? AL * landslideThickness : 0;
   const inferredDamFootprint = damFootprint > 0 ? damFootprint : WD * LDTop;
-  const VD = inferredDamFootprint > 0 && HDmin > 0 ? inferredDamFootprint * HDmin * shapeFactor : 0;
+  const VD = spatialState.demOverride?.VD > 0 ? spatialState.demOverride.VD
+    : (inferredDamFootprint > 0 && HDmin > 0 ? inferredDamFootprint * HDmin * shapeFactor : 0);
   const S = slopeDistance > 0 && slopeUpElevation > 0 && slopeDownElevation > 0
     ? Math.abs(slopeUpElevation - slopeDownElevation) / slopeDistance
     : 0;
@@ -767,8 +770,11 @@ function finishMeasurement() {
   }
   const valueLabel = meta.type === "polygon" ? fmtCompact(value, 0, " m²") : fmtCompact(value, 1, " m");
   layer.bindPopup(`<div class="spatial-popup"><b>${meta.label}</b><span>${valueLabel}</span><span>由右側圖層清單可再次開啟；地圖圖形不阻擋後續量測點選。</span></div>`);
-  addDrawnFeature({ mode: spatialState.activeMode, label: meta.label, valueLabel, layer, color: meta.color });
+  const drawnMode = spatialState.activeMode;
+  addDrawnFeature({ mode: drawnMode, label: meta.label, valueLabel, layer, color: meta.color });
   resetCurrentMeasurement();
+  if (drawnMode === "profile") { spatialState.result.profileLength = value; demProfile(points); }
+  if (drawnMode === "landslide" || drawnMode === "damFootprint") demDiffRefresh();
   renderSpatialResults();
   autoImportSpatialEstimates(`已完成 ${meta.label}：${valueLabel}，`);
 }
@@ -832,6 +838,7 @@ function setMeasurementMode(mode) {
   const meta = measureMeta[mode];
   const message = meta.type === "point"
     ? `${meta.label}：先選擇高程套用目標，再點擊地圖；高程取自 UAV 實測 DSM／災前 DEM（依「高程資料來源」）。`
+    : mode === "profile" ? `${meta.label}：沿壩體橫向或河道縱向連續點選，完成後按「完成量測」，右側顯示 09/30、09/20 與災前三條剖面。`
     : `${meta.label}：在衛星影像上連續點選，完成後按「完成量測」。`;
   setMapStatus(message);
   renderMapLegend();
@@ -851,6 +858,9 @@ function clearSpatialMeasurements() {
     channelSlopeDistance: 0,
     lastElevation: 0
   };
+  spatialState.demOverride = null;
+  document.querySelector("#demDiffPanel").innerHTML = "";
+  document.querySelector("#profilePanel").innerHTML = "";
   renderSpatialResults();
   setMapStatus("已清除量測圖形。請重新選擇量測項目後點選地圖。");
 }
@@ -3907,6 +3917,7 @@ async function gisAutoDraw(kind) {
   if (mode === "damFootprint") spatialState.result.damFootprintArea = area;
   if (mode === "lakeRef") spatialState.result.lakeArea = area;
   map.fitBounds(layer.getBounds(), { padding: [24, 24], maxZoom: 16 });
+  if (mode === "landslide" || mode === "damFootprint") demDiffRefresh();
   renderSpatialResults();
   if (mode !== "lakeRef") autoImportSpatialEstimates(`已由${source}自動圈繪 ${meta.label} ${valueLabel}，`);
   else setMapStatus(`已圈繪本月壩區水域 ${valueLabel}（參考；湖面積與庫容請於「庫容剖面」頁檢核）。`);
@@ -4002,4 +4013,204 @@ function dsmDetailHtml(d) {
   const post = d.vals.uav0930 ?? d.vals.uav0920;
   const diff = post != null && d.vals.cop30 != null ? post - d.vals.cop30 : null;
   return `${rows}${diff == null ? "" : `<span><b>災後 − 災前：${diff >= 0 ? "+" : ""}${diff.toFixed(1)} m</b>（${diff >= 0 ? "堆積／抬升" : "剝蝕／下降"}；災前 DEM 含樹冠，林地差值偏小約 10–20 m）</span>`}${d.note ? `<span>${d.note}</span>` : ""}`;
+}
+
+
+// ---------------------------------------------------------------- DSM 剖面與 DEM 差分
+const DEM_POST = { uav0930: "#dc2626", uav0920: "#f59e0b" };
+
+function demLatLngs(layer) {
+  // 手動圈繪（L.polygon）與自動圈繪（L.geoJSON）統一轉成 TM2 座標的環（含洞、多面）
+  const gj = layer.toGeoJSON();
+  const geoms = gj.type === "FeatureCollection" ? gj.features.map((f) => f.geometry) : [gj.geometry || gj];
+  const rings = [];
+  geoms.forEach((g) => {
+    const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+    polys.forEach((poly) => poly.forEach((ring) => rings.push(ring.map(([lng, lat]) => dsmToTm(lat, lng)))));
+  });
+  return rings;
+}
+
+function ringArea(r) {
+  let a = 0;
+  for (let i = 0; i < r.length; i += 1) { const [x1, y1] = r[i]; const [x2, y2] = r[(i + 1) % r.length]; a += x1 * y2 - x2 * y1; }
+  return Math.abs(a) / 2;
+}
+
+// 以掃描線把多邊形網格化（奇偶規則處理洞），逐格計算 災後 − 災前
+function demDiffStats(id, rings) {
+  const r = dsmState.rasters[id];
+  if (!r || !dsmState.rasters.cop30) return null;
+  const [x0, y0, x1, y1] = r.bbox;
+  const rx = (x1 - x0) / r.w;
+  const ry = (y1 - y0) / r.h;
+  const edges = [];
+  let nMin = Infinity; let nMax = -Infinity;
+  rings.forEach((ring) => ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length];
+    edges.push([a[0], a[1], b[0], b[1]]);
+    nMin = Math.min(nMin, a[1]); nMax = Math.max(nMax, a[1]);
+  }));
+  const j0 = Math.max(0, Math.floor((y1 - nMax) / ry));
+  const j1 = Math.min(r.h - 1, Math.ceil((y1 - nMin) / ry));
+  let gain = 0; let loss = 0; let n = 0; let sum = 0; let nIn = 0;
+  const cell = rx * ry;
+  for (let j = j0; j <= j1; j += 1) {
+    const yc = y1 - (j + 0.5) * ry;
+    const xs = [];
+    edges.forEach(([ax, ay, bx, by]) => { if ((ay > yc) !== (by > yc)) xs.push(ax + (yc - ay) * (bx - ax) / (by - ay)); });
+    xs.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const c0 = Math.max(0, Math.ceil((xs[k] - x0) / rx - 0.5));
+      const c1 = Math.min(r.w - 1, Math.floor((xs[k + 1] - x0) / rx - 0.5));
+      for (let i = c0; i <= c1; i += 1) {
+        nIn += 1;
+        const post = r.data[j * r.w + i];
+        if (!Number.isFinite(post) || post < -1000 || (r.nodata != null && Math.abs(post - r.nodata) < 1e-3)) continue;
+        const pre = dsmSample("cop30", x0 + (i + 0.5) * rx, yc);
+        if (pre == null) continue;
+        const d = post - pre;
+        n += 1; sum += d;
+        if (d > 0) gain += d * cell; else loss -= d * cell;
+      }
+    }
+  }
+  const polyArea = rings.reduce((a, rg) => a + ringArea(rg), 0);      // 近似（洞的面積重複計入時為上限）
+  return { gain, loss, net: gain - loss, mean: n ? sum / n : null, area: n * cell, coverage: polyArea ? Math.min(1, (n * cell) / polyArea) : 0 };
+}
+
+function demLastFeature(mode) {
+  const list = spatialState.drawnLayers.filter((f) => f.mode === mode);
+  return list[list.length - 1] || null;
+}
+
+async function demDiffRefresh() {
+  const box = document.querySelector("#demDiffPanel");
+  if (!box) return;
+  const slide = demLastFeature("landslide");
+  const dam = demLastFeature("damFootprint");
+  if (!slide && !dam) { box.innerHTML = ""; return; }
+  box.innerHTML = `<p class="s2-small">DEM 差分計算中…</p>`;
+  try { await dsmReady(); } catch (e) { box.innerHTML = `<p class="s2-small">DSM 無法載入：${s2Esc(e.message)}</p>`; return; }
+  const rows = [];
+  const res = {};
+  [["landslide", slide, "崩塌範圍 AL"], ["damFootprint", dam, "壩體足跡"]].forEach(([mode, f, name]) => {
+    if (!f) return;
+    const rings = demLatLngs(f.layer);
+    res[mode] = {};
+    Object.keys(DEM_POST).forEach((id) => {
+      const st = demDiffStats(id, rings);
+      res[mode][id] = st;
+      if (st) rows.push(`<tr><td>${name}</td><td>${DSM_SOURCES[id].short}</td><td>${Math.round(st.coverage * 100)}%</td>
+        <td class="t-red">${fmtVol(st.loss)}</td><td class="t-green">${fmtVol(st.gain)}</td><td>${st.mean == null ? "—" : `${st.mean >= 0 ? "+" : ""}${st.mean.toFixed(1)} m`}</td></tr>`);
+    });
+  });
+  spatialState.demStats = res;
+  const src = document.querySelector("#demDiffSource")?.value || "uav0930";
+  const sl = res.landslide?.[src];
+  const dm = res.damFootprint?.[src];
+  const AL = spatialState.result.landslideArea;
+  const tl = sl && sl.coverage > 0.3 && AL > 0 ? sl.loss / (AL * sl.coverage) : null;
+  box.innerHTML = `<h4>DEM 差分（災後 UAV DSM − 災前 DEM）</h4>
+    <table class="s2-nw-table dem-table"><thead><tr><th>範圍</th><th>災後</th><th>覆蓋</th><th>高程下降體積</th><th>高程上升體積</th><th>平均變化</th></tr></thead><tbody>${rows.join("") || `<tr><td colspan="6">範圍不在 UAV DSM 內</td></tr>`}</tbody></table>
+    <label class="dem-src">差分採用<select id="demDiffSource">${Object.keys(DEM_POST).map((id) => `<option value="${id}" ${id === src ? "selected" : ""}>${DSM_SOURCES[id].label}</option>`).join("")}</select></label>
+    <div class="dem-actions">
+      <button type="button" class="outline" data-dem-act="tl" ${tl ? "" : "disabled"}>以下降體積反推平均厚度 TL${tl ? `（${tl.toFixed(1)} m）` : ""}</button>
+      <button type="button" class="outline" data-dem-act="vd" ${dm && dm.gain > 0 ? "" : "disabled"}>VD 改採壩體堆積體積${dm ? `（${fmtVol(dm.gain)}）` : ""}</button>
+      ${spatialState.demOverride?.VD ? `<button type="button" class="outline" data-dem-act="vdreset">VD 改回足跡×HDmin×形狀係數</button>` : ""}
+    </div>
+    <p class="s2-small">只計算 UAV DSM 範圍內（覆蓋欄）。災前 DEM 為 30 m 且含樹冠：原為林地的崩塌源區，下降量會多算約樹高（10–20 m）；兩期尚未以穩定地表配準，數值供量級檢核。09/20 為潰決前、09/30 為潰決後。</p>`;
+  document.querySelector("#demDiffSource").addEventListener("change", demDiffRefresh);
+  box.querySelectorAll("[data-dem-act]").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.demAct === "tl" && tl) {
+      document.querySelector("#landslideThickness").value = tl.toFixed(1);
+      handleSpatialEstimateInput();
+      setMapStatus(`已以 DEM 差分反推崩塌平均厚度 TL = ${tl.toFixed(1)} m（VL 隨之更新）。`);
+    }
+    if (b.dataset.demAct === "vd" && dm) {
+      spatialState.demOverride = { VD: dm.gain, source: src };
+      renderSpatialResults();
+      autoImportSpatialEstimates(`VD 已改採 DEM 差分堆積體積 ${fmtVol(dm.gain)}，`);
+    }
+    if (b.dataset.demAct === "vdreset") { spatialState.demOverride = null; renderSpatialResults(); autoImportSpatialEstimates("VD 已改回足跡估算，"); }
+    demDiffRefresh();
+  }));
+}
+
+function fmtVol(v) {
+  if (!Number.isFinite(v)) return "—";
+  return v >= 1e6 ? `${(v / 1e6).toFixed(2)} 百萬 m³` : `${Math.round(v).toLocaleString("zh-TW")} m³`;
+}
+
+async function demProfile(points) {
+  const box = document.querySelector("#profilePanel");
+  if (!box) return;
+  box.innerHTML = `<p class="s2-small">剖面計算中…</p>`;
+  try { await dsmReady(); } catch (e) { box.innerHTML = `<p class="s2-small">DSM 無法載入：${s2Esc(e.message)}</p>`; return; }
+  const tm = points.map((p) => dsmToTm(p.lat, p.lng));
+  const samples = [];
+  let dist = 0;
+  for (let k = 1; k < tm.length; k += 1) {
+    const [ax, ay] = tm[k - 1]; const [bx, by] = tm[k];
+    const len = Math.hypot(bx - ax, by - ay);
+    const n = Math.max(1, Math.ceil(len / 5));
+    for (let t = k === 1 ? 0 : 1; t <= n; t += 1) {
+      const f = t / n;
+      const E = ax + (bx - ax) * f; const N = ay + (by - ay) * f;
+      const ll = L.latLng(points[k - 1].lat + (points[k].lat - points[k - 1].lat) * f, points[k - 1].lng + (points[k].lng - points[k - 1].lng) * f);
+      samples.push({ d: dist + len * f, ll, v: Object.fromEntries(Object.keys(DSM_SOURCES).map((id) => [id, dsmSample(id, E, N)])) });
+    }
+    dist += len;
+  }
+  const series = { uav0930: "#dc2626", uav0920: "#f59e0b", cop30: "#16a34a" };
+  const all = samples.flatMap((s) => Object.values(s.v).filter((z) => z != null));
+  if (!all.length) { box.innerHTML = `<p class="s2-small">剖面不在 DSM 範圍內。</p>`; return; }
+  const zMin = Math.min(...all); const zMax = Math.max(...all);
+  const W = 640; const H = 260; const pl = 52; const pr = 12; const pt = 12; const pb = 30;
+  const X = (d) => pl + (d / dist) * (W - pl - pr);
+  const Y = (z) => pt + (1 - (z - zMin) / Math.max(1, zMax - zMin)) * (H - pt - pb);
+  const paths = Object.entries(series).map(([id, col]) => {
+    let dstr = ""; let pen = false;
+    samples.forEach((s) => { const z = s.v[id]; if (z == null) { pen = false; return; } dstr += `${pen ? "L" : "M"}${X(s.d).toFixed(1)},${Y(z).toFixed(1)}`; pen = true; });
+    return dstr ? `<path d="${dstr}" fill="none" stroke="${col}" stroke-width="2" ${id === "cop30" ? 'stroke-dasharray="6 4"' : ""}></path>` : "";
+  }).join("");
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => { const z = zMin + (zMax - zMin) * f; return `<text x="${pl - 6}" y="${Y(z) + 4}" text-anchor="end">${Math.round(z)}</text><line x1="${pl}" x2="${W - pr}" y1="${Y(z)}" y2="${Y(z)}" stroke="#e5ebee"></line>`; }).join("");
+  const ext = (id, fn) => samples.filter((s) => s.v[id] != null).reduce((best, s) => (!best || fn(s.v[id], best.v[id]) ? s : best), null);
+  const picks = { crest0930: ext("uav0930", (a, b) => a > b), crest0920: ext("uav0920", (a, b) => a > b), bedPre: ext("cop30", (a, b) => a < b) };
+  demProfile.last = { samples, picks, dist };
+  const pv = (p, id) => (p ? `${p.v[id].toFixed(1)} m（距起點 ${Math.round(p.d)} m）` : "—");
+  box.innerHTML = `<h4>DSM 剖面（長 ${Math.round(dist)} m）</h4>
+    <svg viewBox="0 0 ${W} ${H}" class="dem-profile">${ticks}${paths}<text x="${W / 2}" y="${H - 6}" text-anchor="middle">沿線距離（m）</text></svg>
+    <div class="s2-legend"><span><i class="sw" style="background:#dc2626"></i>09/30 UAV（潰決後）</span><span><i class="sw" style="background:#f59e0b"></i>09/20 UAV（潰決前）</span><span><i class="sw dash" style="border-color:#16a34a"></i>災前 DEM</span></div>
+    <ul class="s2-anom-facts"><li>09/30 最高點：${pv(picks.crest0930, "uav0930")}</li><li>09/20 最高點：${pv(picks.crest0920, "uav0920")}</li><li>災前最低點（原河床）：${pv(picks.bedPre, "cop30")}</li></ul>
+    <div class="dem-actions">
+      <button type="button" class="outline" data-prof="crest0930" ${picks.crest0930 ? "" : "disabled"}>09/30 最高點 → 壩頂高程</button>
+      <button type="button" class="outline" data-prof="crest0920" ${picks.crest0920 ? "" : "disabled"}>09/20 最高點 → 壩頂高程</button>
+      <button type="button" class="outline" data-prof="bedPre" ${picks.bedPre ? "" : "disabled"}>災前最低點 → 原河床高程</button>
+      <button type="button" class="outline" data-prof="wd">剖面長度 → 壩寬 WD</button>
+      <button type="button" class="outline" data-prof="ld">剖面長度 → 壩長 LDTop</button>
+    </div>
+    <p class="s2-small">壩寬 WD 沿河道方向、壩長 LDTop 橫越河谷；HDmin＝壩頂（溢流控制點）−原河床。</p>`;
+  box.querySelectorAll("[data-prof]").forEach((b) => b.addEventListener("click", () => demProfilePick(b.dataset.prof)));
+}
+
+function demProfilePick(kind) {
+  const last = demProfile.last;
+  if (!last) return;
+  if (kind === "wd" || kind === "ld") {
+    if (kind === "wd") spatialState.result.damWidth = last.dist; else spatialState.result.damLength = last.dist;
+    renderSpatialResults();
+    autoImportSpatialEstimates(`已以剖面長度 ${Math.round(last.dist)} m 作為${kind === "wd" ? "壩寬 WD" : "壩長 LDTop"}，`);
+    return;
+  }
+  const p = last.picks[kind];
+  if (!p) return;
+  const id = kind === "bedPre" ? "cop30" : kind === "crest0930" ? "uav0930" : "uav0920";
+  const target = kind === "bedPre" ? "riverbedElevation" : "crestElevation";
+  document.querySelector(`#${target}`).value = p.v[id].toFixed(1);
+  const meta = measureMeta.elevationPoint;
+  const marker = L.circleMarker(p.ll, { radius: 7, color: meta.color, fillColor: kind === "bedPre" ? "#16a34a" : "#dc2626", fillOpacity: 0.9, weight: 2, interactive: false }).addTo(spatialState.map);
+  addDrawnFeature({ mode: "elevationPoint", label: `${elevationTargetLabels[target]}（剖面）`, valueLabel: `${p.v[id].toFixed(1)} m`, layer: marker, color: meta.color });
+  handleSpatialEstimateInput();
+  setMapStatus(`已由 DSM 剖面帶入${elevationTargetLabels[target]} ${p.v[id].toFixed(1)} m（${DSM_SOURCES[id].label}）。`);
 }
