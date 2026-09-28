@@ -31,6 +31,8 @@
 .stereo-candidate-list > div { display: grid; gap: 5px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #f7fbfd; }
 .stereo-candidate-list strong { color: var(--ink); }
 .stereo-candidate-list span, .stereo-candidate-footnote { font-size: 13px; }
+.stereo-public-model { margin-bottom: 12px !important; padding: 10px 12px; border-left: 3px solid var(--cyan); background: #f0faf9; font-size: 14px; }
+.stereo-public-model strong { color: var(--ink); }
 .stereo-candidate-status a { color: #246e9e; }
 @media (max-width: 800px) { .stereo-candidate-list { grid-template-columns: 1fr; } }
 @media (max-width: 800px) { .model3d-metadata-layout { grid-template-columns: 1fr; } .terrain-frame { height: 940px; } }
