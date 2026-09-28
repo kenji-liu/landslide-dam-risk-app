@@ -2632,3 +2632,8 @@ body.s2-lb-open { overflow: hidden; }
 .model3d-link p { margin: 4px 0; }
 .spatial-popup .go3d { margin-top: 6px; font-size: 12px; padding: 4px 8px; }
 .s2-row-acts { display: flex; gap: 4px; }
+
+/* ---- 圈繪清單：編輯邊界 ---- */
+.drawn-row { display: flex; gap: 6px; align-items: stretch; }
+.drawn-row .drawn-layer-button { flex: 1; min-width: 0; }
+.drawn-edit { font-size: 12px; padding: 4px 8px; white-space: nowrap; }

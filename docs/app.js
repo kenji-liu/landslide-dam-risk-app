@@ -661,13 +661,18 @@ function renderDrawnLayerList() {
     list.innerHTML = `<p class="muted-empty">尚未建立圈繪圖層。</p>`;
     return;
   }
-  list.innerHTML = spatialState.drawnLayers.map((feature) => `
+  list.innerHTML = spatialState.drawnLayers.map((feature) => {
+    const editable = ["landslide", "damFootprint", "lakeRef"].includes(feature.mode);
+    const editing = typeof gisEdit !== "undefined" && gisEdit.id === feature.id;
+    return `<div class="drawn-row">
     <button type="button" class="drawn-layer-button ${spatialState.selectedFeatureId === feature.id ? "active" : ""}" data-feature-id="${feature.id}">
       <i class="drawn-layer-swatch" style="--layer-color:${feature.color}"></i>
       <span>${feature.label}</span>
       <span class="drawn-layer-value">${feature.valueLabel}</span>
     </button>
-  `).join("");
+    ${editable ? `<button type="button" class="${editing ? "" : "outline"} drawn-edit" data-edit-feature="${feature.id}">${editing ? "完成編輯" : "編輯邊界"}</button>` : ""}
+  </div>`;
+  }).join("");
 }
 
 function addDrawnFeature({ mode, label, valueLabel, layer, color }) {
@@ -744,7 +749,7 @@ function drawCurrentMeasurement() {
 }
 
 function finishMeasurement() {
-  if (!spatialState.map) return;
+  if (!spatialState.map || spatialState.editing) return;
   const meta = measureMeta[spatialState.activeMode];
   if (meta?.type === "point") {
     setMapStatus(`點選高程：請先選擇「高程套用目標」，再直接點擊地圖位置。`);
@@ -791,6 +796,7 @@ async function handleElevationClick(latlng) {
     const elevation = detail.value;
     const input = document.querySelector(`#${target}`);
     if (input) input.value = elevation.toFixed(1);
+    gisNoteElev(target, elevation, `地圖點選，${detail.label}`);
     spatialState.result.lastElevation = elevation;
     const meta = measureMeta.elevationPoint;
     const marker = L.circleMarker(latlng, {
@@ -820,6 +826,7 @@ async function handleElevationClick(latlng) {
 }
 
 function handleMapClick(event) {
+  if (spatialState.editing) return;
   if (spatialState.activeMode === "elevationPoint") {
     handleElevationClick(event.latlng);
     return;
@@ -1231,7 +1238,7 @@ DBI = ${fmt(latest.dbi)}，AHWL_Dis = ${fmt(latest.ahwlDis)}，HDSI = ${fmt(late
 以蓄水體積 ${fmt(latest.VW, 0)} m³ 與潰壩歷時 ${fmt(latest.TcHr, 1)} hr 進行洪峰流量初估，代表洪峰流量約 ${fmt(latest.qpSelected, 0)} m³/s，代表斷面水深約 ${fmt(latest.waterDepth, 1)} m；保全危害度判定為「${latest.exposure}」。
 
 四、初步致災風險與處置建議
-依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。${storageLine}${modelLine}${typeof monState !== "undefined" && monState ? monitoringReportSection() : ""}`;
+依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。${storageLine}${modelLine}${typeof spatialBasisLines === "function" && spatialBasisLines().length ? `\n補充、空間研判依據（Sentinel-2／實測 DSM／3D 模型）\n${spatialBasisLines().map((x) => `・${x}`).join("\n")}` : ""}${typeof monState !== "undefined" && monState ? monitoringReportSection() : ""}`;
 }
 
 function renderAiSummary() {
@@ -1261,6 +1268,7 @@ function keyMetricLines() {
   if (model3dState) {
     lines.push(`3D 模型：${model3dState.name || "未命名"}，${model3dState.type || "資料型態待填"}，登錄完整度 ${model3dState.score}%（不代表高程精度）`);
   }
+  if (typeof spatialBasisLines === "function") spatialBasisLines().forEach((x) => lines.push(`空間研判：${x}`));
   return lines;
 }
 
@@ -3582,6 +3590,7 @@ async function initMonitoringNotice() {
   } catch (e) { /* 無回報 */ }
   renderMonitoringNotice();
   renderReport();
+  if (typeof gisSarRender === "function") gisSarRender();
 }
 
 function monShow(msg, tone) {
@@ -3904,6 +3913,7 @@ async function gisS2Render() {
     if (pts.length) notes.push(`本月標記 ${pts.length} 處（編號同 Sentinel-2 頁清單）。`);
   }
   document.querySelector("#gisS2Note").textContent = notes.join(" ");
+  if (typeof gisSarRender === "function") gisSarRender();
 }
 
 async function gisAutoDraw(kind) {
@@ -3973,6 +3983,7 @@ function dsmReady() {
           dsmState.rasters[id] = { data, w: img.getWidth(), h: img.getHeight(), bbox: img.getBoundingBox(), nodata: img.getGDALNoData() };
         } catch (e) { console.warn("DSM 載入失敗", id, e); }
       }));
+      try { dsmState.align = (await (await fetch("./assets/models/dsm_alignment.json")).json()).models || {}; } catch (e) { dsmState.align = {}; }
     })().catch((e) => { dsmState.loading = null; throw e; });
   }
   return dsmState.loading;
@@ -4027,9 +4038,10 @@ async function lookupElevationDetail(latlng, target) {
 
 function dsmDetailHtml(d) {
   const rows = Object.entries(DSM_SOURCES).map(([id, s]) => `<span>${s.short}：${d.vals[id] == null ? "範圍外" : `${d.vals[id].toFixed(1)} m`}</span>`).join("");
-  const post = d.vals.uav0930 ?? d.vals.uav0920;
-  const diff = post != null && d.vals.cop30 != null ? post - d.vals.cop30 : null;
-  return `${rows}${diff == null ? "" : `<span><b>災後 − 災前：${diff >= 0 ? "+" : ""}${diff.toFixed(1)} m</b>（${diff >= 0 ? "堆積／抬升" : "剝蝕／下降"}；災前 DEM 含樹冠，林地差值偏小約 10–20 m）</span>`}${d.note ? `<span>${d.note}</span>` : ""}`;
+  const pid = d.vals.uav0930 != null ? "uav0930" : "uav0920";
+  const post = d.vals[pid];
+  const diff = post != null && d.vals.cop30 != null ? post - d.vals.cop30 - dsmOffset(pid) : null;
+  return `${rows}${diff == null ? "" : `<span><b>災後 − 災前：${diff >= 0 ? "+" : ""}${diff.toFixed(1)} m</b>（${diff >= 0 ? "堆積／抬升" : "剝蝕／下降"}；已扣穩定地表偏移 ${dsmOffset(pid).toFixed(1)} m；災前 DEM 含樹冠，林地差值偏小約 10–20 m）</span>`}${d.note ? `<span>${d.note}</span>` : ""}`;
 }
 
 
@@ -4086,7 +4098,7 @@ function demDiffStats(id, rings) {
         if (!Number.isFinite(post) || post < -1000 || (r.nodata != null && Math.abs(post - r.nodata) < 1e-3)) continue;
         const pre = dsmSample("cop30", x0 + (i + 0.5) * rx, yc);
         if (pre == null) continue;
-        const d = post - pre;
+        const d = post - pre - dsmOffset(id);            // 扣除穩定地表整體偏移
         n += 1; sum += d;
         if (d > 0) gain += d * cell; else loss -= d * cell;
       }
@@ -4123,6 +4135,7 @@ async function demDiffRefresh() {
     });
   });
   spatialState.demStats = res;
+  if (typeof renderReport === "function") renderReport();       // 差分完成後更新通報報告的空間研判依據
   const src = document.querySelector("#demDiffSource")?.value || "uav0930";
   const sl = res.landslide?.[src];
   const dm = res.damFootprint?.[src];
@@ -4136,7 +4149,7 @@ async function demDiffRefresh() {
       <button type="button" class="outline" data-dem-act="vd" ${dm && dm.gain > 0 ? "" : "disabled"}>VD 改採壩體堆積體積${dm ? `（${fmtVol(dm.gain)}）` : ""}</button>
       ${spatialState.demOverride?.VD ? `<button type="button" class="outline" data-dem-act="vdreset">VD 改回足跡×HDmin×形狀係數</button>` : ""}
     </div>
-    <p class="s2-small">只計算 UAV DSM 範圍內（覆蓋欄）。災前 DEM 為 30 m 且含樹冠：原為林地的崩塌源區，下降量會多算約樹高（10–20 m）；兩期尚未以穩定地表配準，數值供量級檢核。09/20 為潰決前、09/30 為潰決後。</p>`;
+    <p class="s2-small">只計算 UAV DSM 範圍內（覆蓋欄）。已以穩定地表（崩塌、殘壩、湖域、下游以外林地）校正整體高程偏移：${Object.keys(DEM_POST).map((id) => `${DSM_SOURCES[id].short} ${dsmOffset(id).toFixed(1)} m（±${dsmAlignSd(id)} m）`).join("、")}。災前 DEM 為 30 m 且含樹冠，原為林地的崩塌源區下降量會多算約樹高（10–20 m）；數值供量級檢核。09/20 為潰決前、09/30 為潰決後。</p>`;
   document.querySelector("#demDiffSource").addEventListener("change", demDiffRefresh);
   box.querySelectorAll("[data-dem-act]").forEach((b) => b.addEventListener("click", () => {
     if (b.dataset.demAct === "tl" && tl) {
@@ -4225,6 +4238,7 @@ function demProfilePick(kind) {
   const id = kind === "bedPre" ? "cop30" : kind === "crest0930" ? "uav0930" : "uav0920";
   const target = kind === "bedPre" ? "riverbedElevation" : "crestElevation";
   document.querySelector(`#${target}`).value = p.v[id].toFixed(1);
+  gisNoteElev(target, p.v[id], `DSM 剖面，${DSM_SOURCES[id].label}`);
   const meta = measureMeta.elevationPoint;
   const marker = L.circleMarker(p.ll, { radius: 7, color: meta.color, fillColor: kind === "bedPre" ? "#16a34a" : "#dc2626", fillOpacity: 0.9, weight: 2, interactive: false }).addTo(spatialState.map);
   addDrawnFeature({ mode: "elevationPoint", label: `${elevationTargetLabels[target]}（剖面）`, valueLabel: `${p.v[id].toFixed(1)} m`, layer: marker, color: meta.color });
@@ -4293,6 +4307,9 @@ async function gis3dSendOverlays() {
   (m?.ndvi_anomaly?.candidates || []).filter((c) => ["new", "new_pending"].includes(c.class))
     .concat((m?.mom?.blocks || []).filter((b) => b.class === "new_bare"))
     .forEach((c) => addGeom({ type: "Point", coordinates: [c.lon, c.lat] }, "#ff3b3b"));
+  if (document.querySelector("#gisSarPts")?.checked && typeof monState !== "undefined") {
+    (monState.sar?.points || []).forEach((sp) => addGeom({ type: "Point", coordinates: [sp.lon, sp.lat] }, SAR_COLORS[sp.level_class] || "#64748b"));
+  }
   win.postMessage({ type: "terrain-overlays", items }, location.origin);
 }
 
@@ -4337,6 +4354,7 @@ function gis3dUsePick(target) {
   if (target === "map") { gisOpenAt(p.lat, p.lng, `3D 點選 H ${p.h.toFixed(1)} m`); return; }
   const input = document.querySelector(`#${target}`);
   if (input) input.value = p.h.toFixed(1);
+  gisNoteElev(target, p.h, `3D 模型點選，${DSM_SOURCES[MODEL_TO_DSM[p.model]]?.label || p.model}`);
   if (spatialState.map) {
     const meta = measureMeta.elevationPoint;
     const marker = L.circleMarker([p.lat, p.lng], { radius: 7, color: meta.color, fillColor: "#7c3aed", fillOpacity: 0.9, weight: 2, interactive: false }).addTo(spatialState.map);
@@ -4371,3 +4389,123 @@ document.querySelector("#satelliteMap")?.addEventListener("click", (e) => {
   const [lat, lng] = b.dataset.go3d.split(",").map(Number);
   gis3dFocus(lat, lng);
 });
+
+
+// ---------------------------------------------------------------- 補完：偏移校正、可編輯邊界、SAR 監測點、報告依據
+const DSM_MODEL_ID = { uav0930: "matayan_20250930", uav0920: "matayan_20250920" };
+function dsmOffset(id) { return Number(dsmState.align?.[DSM_MODEL_ID[id]]?.offset_m) || 0; }
+function dsmAlignSd(id) { const v = dsmState.align?.[DSM_MODEL_ID[id]]?.robust_sd_m; return v == null ? "—" : Number(v).toFixed(1); }
+
+function gisNoteElev(target, value, how) {
+  spatialState.elevSrc = { ...(spatialState.elevSrc || {}), [target]: `${Number(value).toFixed(1)} m（${how}）` };
+}
+
+function spatialBasisLines() {
+  const out = [];
+  const last = (mode) => spatialState.drawnLayers.filter((f) => f.mode === mode).pop();
+  const al = last("landslide");
+  const fp = last("damFootprint");
+  if (al) out.push(`崩塌面積 AL ${al.valueLabel}（${al.label}）`);
+  if (fp) out.push(`壩體足跡 ${fp.valueLabel}（${fp.label}）`);
+  Object.entries(spatialState.elevSrc || {}).forEach(([k, v]) => out.push(`${elevationTargetLabels[k] || k} ${v}`));
+  const ds = spatialState.demStats?.damFootprint;
+  if (ds) out.push(`DEM 差分（壩體足跡內，已扣穩定地表偏移）：${Object.entries(ds).filter(([, v]) => v).map(([id, v]) => `${DSM_SOURCES[id].short} 堆積 ${fmtVol(v.gain)}、平均 ${v.mean >= 0 ? "+" : ""}${v.mean?.toFixed(1)} m`).join("；")}`);
+  if (spatialState.demOverride?.VD) out.push(`VD 採 DEM 差分堆積體積 ${fmtVol(spatialState.demOverride.VD)}（${DSM_SOURCES[spatialState.demOverride.source]?.label || ""}）`);
+  if (out.length && s2State.data) out.push(`Sentinel-2 參考月份 ${s2Months()[s2State.index].roc_month}`);
+  return out;
+}
+
+// 可編輯邊界：Leaflet-Geoman（拖曳頂點、拖曳邊中點新增、右鍵刪除）
+var gisEdit = { id: null, loading: null };
+function gisGeomanReady() {
+  if (!gisEdit.loading) {
+    gisEdit.loading = (async () => {
+      const css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = "https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css";
+      document.head.appendChild(css);
+      await gisLoadScript("https://cdn.jsdelivr.net/npm/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.js");
+    })().catch((e) => { gisEdit.loading = null; throw e; });
+  }
+  return gisEdit.loading;
+}
+
+function latLngsArea(ll) {
+  if (!ll || !ll.length) return 0;
+  if (ll[0] instanceof L.LatLng) return polygonArea(ll);
+  if (ll[0][0] instanceof L.LatLng) return Math.max(0, polygonArea(ll[0]) - ll.slice(1).reduce((a, hole) => a + polygonArea(hole), 0));
+  return ll.reduce((a, poly) => a + latLngsArea(poly), 0);
+}
+
+function gisSimplifyRing(ring, tolM) {
+  if (ring.length < 8) return ring;
+  const map = spatialState.map;
+  const z = 17;
+  const mpp = 156543.03 * Math.cos(ring[0].lat * Math.PI / 180) / 2 ** z;
+  const simp = L.LineUtil.simplify(ring.map((ll) => map.project(ll, z)), tolM / mpp);
+  return simp.length >= 4 ? simp.map((pt) => map.unproject(pt, z)) : ring;
+}
+
+async function gisToggleEdit(id) {
+  const map = spatialState.map;
+  const f = spatialState.drawnLayers.find((x) => x.id === id);
+  if (!map || !f) return;
+  if (gisEdit.id === id) {                                     // 完成編輯
+    f.layer.pm?.disable();
+    gisEdit.id = null;
+    spatialState.editing = false;
+    const area = latLngsArea(f.layer.getLatLngs());
+    if (f.mode === "landslide") spatialState.result.landslideArea = area;
+    if (f.mode === "damFootprint") spatialState.result.damFootprintArea = area;
+    if (f.mode === "lakeRef") spatialState.result.lakeArea = area;
+    f.valueLabel = `${fmtCompact(area, 0, " m²")}（${(area / 1e4).toFixed(1)} ha）`;
+    if (!f.label.includes("已人工修正")) f.label += "（已人工修正）";
+    renderSpatialResults();
+    if (f.mode !== "lakeRef") { demDiffRefresh(); autoImportSpatialEstimates(`已完成邊界修正：${f.valueLabel}，`); }
+    gis3dSchedule();
+    return;
+  }
+  if (gisEdit.id) await gisToggleEdit(gisEdit.id);
+  setMapStatus("載入編輯工具中…");
+  try { await gisGeomanReady(); } catch (e) { setMapStatus(`編輯工具無法載入：${e.message}`); return; }
+  if (!map.pm && L.PM?.Map) map.pm = new L.PM.Map(map);
+  const gj = f.layer.toGeoJSON();
+  const polys = [];
+  (gj.type === "FeatureCollection" ? gj.features.map((x) => x.geometry) : [gj.geometry]).forEach((g) => {
+    const list = g?.type === "Polygon" ? [g.coordinates] : g?.type === "MultiPolygon" ? g.coordinates : [];
+    list.forEach((poly) => polys.push(poly.map((r) => gisSimplifyRing(r.map(([lng, lat]) => L.latLng(lat, lng)), 6))));
+  });
+  const kept = polys.filter((poly) => polygonArea(poly[0]) >= 3000);      // 小於 0.3 ha 的碎塊不編輯（併入時會捨去）
+  if (!kept.length) { setMapStatus("此圖形沒有可編輯的範圍。"); return; }
+  map.removeLayer(f.layer);
+  const poly = L.polygon(kept.length === 1 ? kept[0] : kept, { color: f.color, weight: 2.5, fillColor: f.color, fillOpacity: 0.22 }).addTo(map);
+  f.layer = poly;
+  poly.pm.enable({ allowSelfIntersection: true, snappable: false });
+  gisEdit.id = id;
+  spatialState.editing = true;
+  renderDrawnLayerList();
+  map.fitBounds(poly.getBounds(), { padding: [20, 20], maxZoom: 16 });
+  setMapStatus("編輯中：拖曳頂點調整邊界、拖曳邊的中點新增頂點、右鍵頂點刪除；完成後按圖層清單「完成編輯」（已先簡化到約 6 m 精度，並略去 0.3 ha 以下碎塊）。");
+}
+
+document.querySelector("#drawnLayerList")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-edit-feature]");
+  if (!b) return;
+  e.stopPropagation();
+  gisToggleEdit(b.dataset.editFeature);
+}, true);
+
+// SAR 監測點（空間研判與 3D）
+const SAR_COLORS = { ok: "#16a34a", warn: "#f59e0b", danger: "#dc2626" };
+var gisSar = { layer: null };
+function gisSarRender() {
+  const map = spatialState.map;
+  if (!map || !gisS2.pane) return;
+  if (gisSar.layer) { map.removeLayer(gisSar.layer); gisSar.layer = null; }
+  const pts = (typeof monState !== "undefined" && monState.sar?.points) || [];
+  if (!document.querySelector("#gisSarPts")?.checked || !pts.length) return;
+  gisSar.layer = L.layerGroup(pts.filter((p) => p.lat && p.lon).map((p) => L.circleMarker([p.lat, p.lon], {
+    pane: "gisRefPane", radius: 8, color: "#fff", weight: 2, fillColor: SAR_COLORS[p.level_class] || "#64748b", fillOpacity: 1, interactive: false
+  }).bindTooltip(`SAR ${p.name}｜${p.level}｜${p.latest || ""}`, { permanent: true, direction: "left", className: "gis-s2-tip" }))).addTo(map);
+}
+document.querySelector("#gisSarPts")?.addEventListener("change", () => { gisSarRender(); gis3dSchedule(); });

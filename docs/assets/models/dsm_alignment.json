@@ -1,0 +1,17 @@
+{
+ "method": "穩定地表（扣崩積區、殘壩區、湖域、壩區水域、下游河道區各外擴 100 m）上 UAV DSM − 災前 DEM 的中位數；差分時以此偏移校正 UAV。兩者皆含樹冠，偏移含高程基準（TWVD2001／EGM2008）與產製系統差。",
+ "models": {
+  "matayan_20250930": {
+   "offset_m": -5.55,
+   "robust_sd_m": 18.59,
+   "stable_px": 8230,
+   "stable_ha": 20.6
+  },
+  "matayan_20250920": {
+   "offset_m": -4.15,
+   "robust_sd_m": 14.79,
+   "stable_px": 11599,
+   "stable_ha": 29.0
+  }
+ }
+}
