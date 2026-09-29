@@ -20,6 +20,7 @@ const pageTitles = {
   figures: "示意圖庫",
   gis: "空間研判",
   monitor: "SAR監測",
+  fanb: "林保署監測",
   sentinel2: "Sentinel-2監測",
   report: "通報報告",
   ai: "專家摘要"
@@ -1238,7 +1239,7 @@ DBI = ${fmt(latest.dbi)}，AHWL_Dis = ${fmt(latest.ahwlDis)}，HDSI = ${fmt(late
 以蓄水體積 ${fmt(latest.VW, 0)} m³ 與潰壩歷時 ${fmt(latest.TcHr, 1)} hr 進行洪峰流量初估，代表洪峰流量約 ${fmt(latest.qpSelected, 0)} m³/s，代表斷面水深約 ${fmt(latest.waterDepth, 1)} m；保全危害度判定為「${latest.exposure}」。
 
 四、初步致災風險與處置建議
-依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。${storageLine}${modelLine}${typeof spatialBasisLines === "function" && spatialBasisLines().length ? `\n補充、空間研判依據（Sentinel-2／實測 DSM／3D 模型）\n${spatialBasisLines().map((x) => `・${x}`).join("\n")}` : ""}${typeof monState !== "undefined" && monState ? monitoringReportSection() : ""}`;
+依「潰壩危險度 × 保全危害度」矩陣，本案初步致災風險為「${latest.risk}」。建議採取 ${latest.monitoring}；警戒作為為 ${latest.alert}；工程急迫性為 ${latest.urgency}。${storageLine}${modelLine}${typeof fanbReportLines === "function" && fanbReportLines().length ? `\n補充、林保署即時水情（介接）\n${fanbReportLines().map((x) => `・${x}`).join("\n")}` : ""}${typeof spatialBasisLines === "function" && spatialBasisLines().length ? `\n補充、空間研判依據（Sentinel-2／實測 DSM／3D 模型）\n${spatialBasisLines().map((x) => `・${x}`).join("\n")}` : ""}${typeof monState !== "undefined" && monState ? monitoringReportSection() : ""}`;
 }
 
 function renderAiSummary() {
@@ -1269,6 +1270,7 @@ function keyMetricLines() {
     lines.push(`3D 模型：${model3dState.name || "未命名"}，${model3dState.type || "資料型態待填"}，登錄完整度 ${model3dState.score}%（不代表高程精度）`);
   }
   if (typeof spatialBasisLines === "function") spatialBasisLines().forEach((x) => lines.push(`空間研判：${x}`));
+  if (typeof fanbReportLines === "function") fanbReportLines().forEach((x) => lines.push(`林保署即時：${x}`));
   return lines;
 }
 
@@ -1365,6 +1367,7 @@ function showPage(pageId) {
   if (pageId === 'model3d' && terrainFrame && !terrainFrame.getAttribute('src')) terrainFrame.src = terrainFrame.dataset.src;
   terrainFrame?.contentWindow?.postMessage({type: 'terrain-visibility', active: pageId === 'model3d'}, location.origin);
   if (pageId === 'model3d' && typeof gis3dSchedule === 'function') gis3dSchedule();
+  if (pageId === 'fanb' && typeof fanbShow === 'function') setTimeout(fanbShow, 0);   // 延後：網址直接開 #fanb 時程式尚未載入完
   if (pageTitles[pageId] && location.hash !== `#${pageId}`) history.replaceState(null, '', `#${pageId}`);
   if (pageId === "gis" && spatialState.map) {
     setTimeout(() => spatialState.map.invalidateSize(), 120);
@@ -4510,3 +4513,158 @@ function gisSarRender() {
   }).bindTooltip(`${/^SAR/.test(p.name) ? "" : "SAR "}${p.name}｜${p.level}｜${String(p.latest || "").split(" ")[0]}`, { permanent: true, direction: dirs[k % dirs.length], className: "gis-s2-tip" }))).addTo(map);
 }
 document.querySelector("#gisSarPts")?.addEventListener("change", () => { gisSarRender(); gis3dSchedule(); });
+
+
+// ================================================================ 林保署堰塞湖監測（介接）
+var FANB_BASE = "https://www.iiicloud.com.tw/FarmlandQlakenew";
+var FANB_BOARDS = [["BarrierLake", "馬太鞍溪"], ["BarrierLakeWanli", "萬里溪"], ["BarrierLakeLiwu", "合歡溪"]];
+var FANB_RAIN_ALERT = 35;                  // 原系統的時雨量警戒線（mm/hr）
+var fanbState = { wst: null, rst: null, at: null, err: null, board: "BarrierLake", timer: null };
+
+async function fanbFetch(ep) {
+  // 原系統偶爾回傳空內容（其頁面遇到時會自行重新載入）→ 稍候重試 2 次
+  for (let k = 0; k < 3; k += 1) {
+    const r = await fetch(`${FANB_BASE}/BarrierLake/${ep}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(`${ep} 回應 ${r.status}`);
+    const t = (await r.text()).trim();
+    if (t && t !== "null") return JSON.parse(t);
+    await new Promise((res) => setTimeout(res, 1500 * (k + 1)));
+  }
+  throw new Error(`${ep} 暫無回應`);
+}
+
+async function fanbLoad() {
+  const [w, r] = await Promise.allSettled([fanbFetch("getWST"), fanbFetch("getRST")]);
+  if (w.status === "fulfilled") fanbState.wst = Array.isArray(w.value) ? w.value : [];
+  if (r.status === "fulfilled") fanbState.rst = Array.isArray(r.value) ? r.value : [];
+  const errs = [w, r].filter((x) => x.status === "rejected").map((x) => x.reason?.message || String(x.reason));
+  fanbState.err = errs.length ? errs.join("；") : null;
+  if (errs.length < 2) fanbState.at = new Date();
+  fanbRender();
+  if (typeof renderReport === "function" && typeof latest !== "undefined" && latest) renderReport();
+}
+
+function fanbNum(v) {
+  const n = Number(v);
+  return v === null || v === undefined || v === "" || !Number.isFinite(n) ? null : n;
+}
+
+function fanbWater(st) {
+  const labels = String(st.Datetime || "").split(",").filter(Boolean);
+  const values = String(st.Value || "").split(",").filter((x) => x !== "").map(Number);
+  const n = Math.min(labels.length, values.length);
+  const pts = labels.slice(0, n).map((t, i) => ({ t, v: values[i] })).filter((p) => Number.isFinite(p.v));
+  const last = pts[pts.length - 1];
+  const a1 = fanbNum(st.alert1); const a2 = fanbNum(st.alert2); const top = fanbNum(st.alertTOP);
+  const lake = st.Name === "湖區1號水位計";
+  const level = last ? last.v : fanbNum(st.maxValue);
+  const tone = level == null ? "grey" : (top != null && level >= top) || (a1 != null && level >= a1) ? "red"
+    : (a2 != null && level >= a2) || (a1 != null && a1 - level < 1) ? "orange" : "green";
+  return { name: st.Name, id: st.StationID, pts, level, time: st.maxDatetime, a1, a2, top, lake,
+    a1Label: lake ? "溢流口高程" : "警戒水位", change: pts.length > 1 ? Math.round((pts[pts.length - 1].v - pts[0].v) * 100) / 100 || 0 : null, tone };
+}
+
+function fanbRain(st) {
+  const hrs = [...(st.Timeseries || [])].reverse();
+  const rain = [...(st.Rainfall || [])].reverse().map(Number);
+  const sum = rain.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
+  const max = Math.max(0, ...rain.filter(Number.isFinite));
+  return { name: st.Name, id: st.StationNo, time: st.Time, now: fanbNum(st.RAIN), hrs, rain, sum, max,
+    tone: max >= FANB_RAIN_ALERT ? "red" : max >= 15 ? "orange" : "green" };
+}
+
+function fanbRender() {
+  const status = document.querySelector("#fanbStatus");
+  if (!status) return;
+  if (fanbState.err && !fanbState.wst && !fanbState.rst) {
+    status.innerHTML = `<span class="t-red">無法連線林保署系統（${s2Esc(fanbState.err)}）。</span>可按「重新整理」再試，或開啟原系統查看。`;
+    return;
+  }
+  const at = fanbState.at ? fanbState.at.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" }) : "—";
+  status.textContent = `已於 ${at} 取得林保署系統資料${fanbState.err ? `（最近一次更新失敗：${fanbState.err}，顯示上次資料）` : ""}；每 10 分鐘自動更新。`;
+  const ws = (fanbState.wst || []).map(fanbWater);
+  const rs = (fanbState.rst || []).map(fanbRain);
+  const fmtM = (v) => (v == null ? "—" : `${v.toFixed(2)} m`);
+  const cards = ws.map((w) => `<article class="metric-card s2-metric-card ${w.tone}"><span>${s2Esc(w.name)} 水位</span><strong>${fmtM(w.level)}</strong>
+      <small>${s2Esc(w.time || "")}｜${w.a1 != null ? `距${w.a1Label} ${(w.a1 - w.level).toFixed(2)} m` : "無警戒值"}</small>
+      <small>24 小時變化 ${w.change == null ? "—" : `${w.change >= 0 ? "+" : ""}${w.change.toFixed(2)} m`}${w.top != null ? `｜堤頂高 ${w.top} m` : ""}</small></article>`)
+    .concat(rs.map((r) => `<article class="metric-card s2-metric-card ${r.tone}"><span>${s2Esc(r.name)} 雨量站</span><strong>${r.now == null ? "—" : `${r.now} mm`}</strong>
+      <small>${s2Esc(r.time || "")} 時雨量｜24 小時累積 ${r.sum.toFixed(1)} mm</small><small>24 小時最大時雨量 ${r.max} mm${r.max >= FANB_RAIN_ALERT ? "（達警戒 35 mm）" : ""}</small></article>`));
+  document.querySelector("#fanbCards").innerHTML = cards.join("") || `<p class="muted-empty">目前沒有測站資料。</p>`;
+  const w0 = ws[0];
+  document.querySelector("#fanbWstBadge").textContent = w0 ? `${w0.id}｜${w0.level != null && w0.a1 != null && w0.level >= w0.a1 ? "已達警戒" : "未達警戒"}` : "";
+  document.querySelector("#fanbWstChart").innerHTML = w0 ? fanbWaterSvg(w0) : `<p class="muted-empty">無水位資料。</p>`;
+  document.querySelector("#fanbRstBadge").textContent = rs.length ? rs.map((r) => `${r.name} ${r.sum.toFixed(1)} mm`).join("｜") : "";
+  document.querySelector("#fanbRstChart").innerHTML = rs.length ? fanbRainSvg(rs)
+    : `<p class="muted-empty">${String(fanbState.err || "").includes("getRST") ? "原系統雨量資料目前暫無回應（回傳無內容），10 分鐘後自動重試；可按「重新整理」或至原系統查看。" : "無雨量資料。"}</p>`;
+}
+
+function fanbWaterSvg(w) {
+  const W = 900; const H = 300; const pl = 64; const pr = 16; const pt = 16; const pb = 40;
+  const vals = w.pts.map((p) => p.v).concat([w.a1, w.a2, w.top].filter((x) => x != null));
+  const lo = Math.floor(Math.min(...vals) - 0.3); const hi = Math.ceil(Math.max(...vals) + 0.3);
+  const X = (i) => pl + (i / Math.max(1, w.pts.length - 1)) * (W - pl - pr);
+  const Y = (v) => pt + (1 - (v - lo) / Math.max(0.1, hi - lo)) * (H - pt - pb);
+  const line = w.pts.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join("");
+  const ref = (v, col, label) => (v == null ? "" : `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="${col}" stroke-dasharray="6 4" stroke-width="1.5"></line>
+    <text x="${W - pr - 4}" y="${Y(v) - 5}" text-anchor="end" fill="${col}">${label} ${v}</text>`);
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => { const v = lo + (hi - lo) * f; return `<text x="${pl - 6}" y="${Y(v) + 4}" text-anchor="end">${v.toFixed(1)}</text><line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e5ebee"></line>`; }).join("");
+  const step = Math.max(1, Math.round(w.pts.length / 8));
+  const xl = w.pts.map((p, i) => (i % step === 0 ? `<text x="${X(i)}" y="${H - 14}" text-anchor="middle">${s2Esc(p.t)}</text>` : "")).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" class="fanb-svg" role="img" aria-label="${s2Esc(w.name)} 水位時序">${ticks}${ref(w.top, "#334155", "堤頂高")}${ref(w.a1, "#dc2626", w.a1Label)}${ref(w.a2, "#f59e0b", "二級警戒")}
+    <path d="${line}" fill="none" stroke="#2563eb" stroke-width="2.5"></path>${xl}<text x="12" y="${pt + 10}">m</text></svg>
+    <p class="s2-small">最新 ${w.level == null ? "—" : w.level.toFixed(2)} m（${s2Esc(w.time || "")}）；紅虛線＝${w.a1Label}、灰虛線＝堤頂高。</p>`;
+}
+
+function fanbRainSvg(rs) {
+  const W = 900; const H = 300; const pl = 52; const pr = 16; const pt = 16; const pb = 40;
+  const n = Math.max(...rs.map((r) => r.rain.length));
+  const hi = Math.max(FANB_RAIN_ALERT + 5, ...rs.flatMap((r) => r.rain.filter(Number.isFinite)));
+  const cols = ["#0ea5e9", "#7c3aed", "#16a34a"];
+  const bw = (W - pl - pr) / n;
+  const Y = (v) => pt + (1 - v / hi) * (H - pt - pb);
+  const bars = rs.map((r, k) => r.rain.map((v, i) => (Number.isFinite(v) && v > 0
+    ? `<rect x="${pl + i * bw + (k * bw) / rs.length + 1}" y="${Y(v)}" width="${Math.max(1, bw / rs.length - 2)}" height="${Y(0) - Y(v)}" fill="${cols[k % 3]}"></rect>` : "")).join("")).join("");
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => { const v = hi * f; return `<text x="${pl - 6}" y="${Y(v) + 4}" text-anchor="end">${Math.round(v)}</text><line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e5ebee"></line>`; }).join("");
+  const hrs = rs[0].hrs;
+  const step = Math.max(1, Math.round(n / 8));
+  const xl = hrs.map((t, i) => (i % step === 0 ? `<text x="${pl + i * bw + bw / 2}" y="${H - 14}" text-anchor="middle">${s2Esc(t)}</text>` : "")).join("");
+  const alert = `<line x1="${pl}" x2="${W - pr}" y1="${Y(FANB_RAIN_ALERT)}" y2="${Y(FANB_RAIN_ALERT)}" stroke="#dc2626" stroke-dasharray="6 4" stroke-width="1.5"></line><text x="${W - pr - 4}" y="${Y(FANB_RAIN_ALERT) - 5}" text-anchor="end" fill="#dc2626">雨量警戒 ${FANB_RAIN_ALERT} mm/hr</text>`;
+  const allZero = rs.every((r) => r.sum === 0);
+  return `<svg viewBox="0 0 ${W} ${H}" class="fanb-svg" role="img" aria-label="雨量站時雨量">${ticks}${alert}${bars}${xl}<text x="12" y="${pt + 10}">mm</text></svg>
+    <div class="s2-legend">${rs.map((r, k) => `<span><i class="sw" style="background:${cols[k % 3]}"></i>${s2Esc(r.name)}（${s2Esc(r.id)}）</span>`).join("")}</div>
+    ${allZero ? `<p class="s2-small">近 24 小時各站皆無降雨。</p>` : ""}`;
+}
+
+function fanbReportLines() {
+  if (typeof fanbState === "undefined" || !fanbState || (!fanbState.wst && !fanbState.rst)) return [];   // 程式載入初期 renderReport 就會呼叫
+  const out = [];
+  (fanbState.wst || []).map(fanbWater).forEach((w) => {
+    if (w.level != null) out.push(`${w.name}水位 ${w.level.toFixed(2)} m（${w.time || ""}）${w.a1 != null ? `，距${w.a1Label} ${(w.a1 - w.level).toFixed(2)} m` : ""}${w.change != null ? `，24 小時變化 ${w.change >= 0 ? "+" : ""}${w.change.toFixed(2)} m` : ""}`);
+  });
+  (fanbState.rst || []).map(fanbRain).forEach((r) => out.push(`${r.name}雨量站 24 小時累積 ${r.sum.toFixed(1)} mm、最大時雨量 ${r.max} mm`));
+  return out;
+}
+
+function fanbShow() {
+  if (typeof FANB_BOARDS === "undefined" || !FANB_BOARDS) { setTimeout(fanbShow, 50); return; }
+  const frame = document.querySelector("#fanbFrame");
+  const tabs = document.querySelector("#fanbTabs");
+  if (tabs && !tabs.dataset.ready) {
+    tabs.dataset.ready = "1";
+    tabs.innerHTML = FANB_BOARDS.map(([k, t]) => `<button type="button" data-fanb-board="${k}" class="${k === fanbState.board ? "active" : ""}">${t}</button>`).join("");
+    tabs.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-fanb-board]");
+      if (!b) return;
+      fanbState.board = b.dataset.fanbBoard;
+      tabs.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+      frame.src = `${FANB_BASE}/${fanbState.board}`;
+    });
+  }
+  if (frame && !frame.getAttribute("src")) frame.src = `${FANB_BASE}/${fanbState.board}`;
+  if (!fanbState.at || Date.now() - fanbState.at.getTime() > 5 * 60 * 1000) fanbLoad();
+}
+
+document.querySelector("#fanbRefresh")?.addEventListener("click", fanbLoad);
+setTimeout(fanbLoad, 1500);                                                   // 開站即取一次，供通報報告與 AI 摘要使用
+fanbState.timer = setInterval(() => { if (!document.hidden) fanbLoad(); }, 10 * 60 * 1000);

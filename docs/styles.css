@@ -2648,3 +2648,13 @@ body.s2-lb-open { overflow: hidden; }
 .drawn-row { display: flex; gap: 6px; align-items: stretch; }
 .drawn-row .drawn-layer-button { flex: 1; min-width: 0; }
 .drawn-edit { font-size: 12px; padding: 4px 8px; white-space: nowrap; }
+
+/* ---- 林保署監測（介接） ---- */
+.fanb-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin: 16px 0; }
+.fanb-svg { width: 100%; height: auto; background: #fff; border: 1px solid #dde6ea; border-radius: 8px; }
+.fanb-svg text { font-size: 13px; fill: #4b5f6e; }
+.fanb-frame { width: 100%; height: 1500px; border: 1px solid #cfd9de; border-radius: 10px; background: #fff; }
+.s2-metric-card.orange::before { background: #f59e0b; }
+.s2-metric-card.orange strong { color: #b45309; }
+.s2-metric-card.grey::before { background: #94a3b8; }
+@media (max-width: 1180px) { .fanb-grid { grid-template-columns: 1fr; } }

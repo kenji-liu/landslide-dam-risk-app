@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260928-gis4-stereo3" />
+    <link rel="stylesheet" href="./styles.css?v=20260929-fanb1" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -24,6 +24,7 @@
       <button class="nav-item" data-page="figures"><span>圖</span> 示意圖庫</button>
       <button class="nav-item" data-page="gis"><span>◎</span> 空間研判</button>
       <button class="nav-item" data-page="monitor"><span>雷</span> SAR監測</button>
+      <button class="nav-item" data-page="fanb"><span>林</span> 林保署監測</button>
       <button class="nav-item" data-page="sentinel2"><span>葉</span> Sentinel-2</button>
       <button class="nav-item" data-page="report"><span>▨</span> 通報報告</button>
       <button class="nav-item" data-page="ai"><span>AI</span> 專家摘要</button>
@@ -549,6 +550,40 @@
         </div>
       </section>
 
+      <section class="page" id="fanb">
+        <div class="toolbar-card">
+          <div>
+            <h2>林保署堰塞湖監測（介接）</h2>
+            <p>即時介接農業部林業及自然保育署「國有林防災應變及堰塞湖監測系統」的馬太鞍溪橋水位與雨量站資料（原始觀測：經濟部水利署、交通部中央氣象署），並嵌入原系統的 CCTV 與監控面板。每 10 分鐘自動更新。</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="fanbRefresh" class="outline" type="button">重新整理</button>
+            <a class="terrain-open-link" href="https://www.iiicloud.com.tw/FarmlandQlakenew/BarrierLake" target="_blank" rel="noopener">開啟原系統 ↗</a>
+          </div>
+        </div>
+        <p id="fanbStatus" class="s2-small">資料載入中…</p>
+        <div id="fanbCards" class="cards metric-cards"></div>
+        <div class="fanb-grid">
+          <article class="s2-overview-card">
+            <div class="s2-card-head"><div><span class="section-kicker">Water level</span><h3>馬太鞍溪橋水位（近 24 小時）</h3></div><span id="fanbWstBadge" class="s2-observation-count"></span></div>
+            <div id="fanbWstChart" class="fanb-chart"></div>
+          </article>
+          <article class="s2-overview-card">
+            <div class="s2-card-head"><div><span class="section-kicker">Rainfall</span><h3>雨量站時雨量（近 24 小時）</h3></div><span id="fanbRstBadge" class="s2-observation-count"></span></div>
+            <div id="fanbRstChart" class="fanb-chart"></div>
+          </article>
+        </div>
+        <article class="s2-overview-card">
+          <div class="s2-card-head">
+            <div><span class="section-kicker">Original dashboard</span><h3>原系統畫面（CCTV、監控面板、最新消息）</h3></div>
+            <div id="fanbTabs" class="s2-metric-tabs" aria-label="切換儀錶板"></div>
+          </div>
+          <p class="s2-small">以下為林保署原系統頁面嵌入，操作與資料以原系統為準；若無法顯示，請按右上角「開啟原系統」。</p>
+          <iframe id="fanbFrame" class="fanb-frame" title="林保署國有林防災應變及堰塞湖監測系統" referrerpolicy="no-referrer"></iframe>
+        </article>
+        <p class="s2-source">資料來源：農業部林業及自然保育署 國有林防災應變及堰塞湖監測系統（網站維護：三川雲科技）；水位原始觀測：經濟部水利署；雨量：交通部中央氣象署。本平台僅介接顯示，數值以原系統為準。</p>
+      </section>
+
       <section class="page" id="sentinel2">
         <div class="toolbar-card s2-heading">
           <div>
@@ -841,6 +876,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260928-gis4"></script>
+    <script src="./app.js?v=20260929-fanb3"></script>
   </body>
 </html>
