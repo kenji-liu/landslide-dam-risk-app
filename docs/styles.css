@@ -2676,3 +2676,9 @@ body.s2-lb-open { overflow: hidden; }
 .savi-flows { list-style: none; padding: 0; margin: 4px 0 10px; font-size: 13px; }
 .savi-flows li { display: flex; align-items: center; gap: 2px; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; }
 .savi-flows li b { margin-left: auto; }
+.savi-table .savi-total td { font-weight: 700; background: #f5f8f7; }
+.savi-hot td:last-child { text-align: right; }
+.savi-hot button { padding: 3px 10px; font-size: 12px; }
+#saviTerrainBody .savi-plain p { margin: 0 0 8px; font-size: 13.5px; line-height: 1.65; }
+.savi-plain { background: #f5f8f7; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+.savi-hot th, .savi-hot td { padding-left: 4px; padding-right: 4px; }

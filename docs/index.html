@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260930-savi1" />
+    <link rel="stylesheet" href="./styles.css?v=20260930-savi3" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -392,7 +392,7 @@
                   <option value="dprev">植生變化：與上個月比</option>
                   <option value="recovery">崩積區植物恢復分區</option>
                   <option value="ndwi">NDWI 水域</option>
-                  <optgroup label="SAVI 植生覆蓋三期（固定期別，不隨月份）" id="gisSaviOpts"></optgroup>
+                  <optgroup label="SAVI 三期與延伸分析（固定期別，不隨月份）" id="gisSaviOpts"></optgroup>
                 </select>
               </label>
               <label class="s2-blend">透明<input id="gisS2Opacity" type="range" min="0" max="100" step="5" value="70" aria-label="Sentinel-2 圖層不透明度" />不透明</label>
@@ -759,6 +759,27 @@
           </details>
         </article>
 
+        <article class="s2-overview-card" id="saviTerrainCard" hidden>
+          <div class="s2-card-head">
+            <div>
+              <span class="section-kicker">SAVI × terrain × DoD</span>
+              <h3>延伸分析：坡度坡向退化熱點 × DoD 沖淤比對</h3>
+            </div>
+            <span id="saviTerrainBadge" class="s2-observation-count"></span>
+          </div>
+          <p class="s2-overview-note"><b>這在看什麼？</b>把上方 SAVI「災前一年 → 潰決後一年」由植生變成裸露地的位置，疊上事件前的光達地形（內政部 20 m DTM）：看哪些坡度、坡向最容易退化，並列出面積 ≥ 1 ha 的<b>退化熱點</b>；在有 UAV 地形的壩區，再用地形差分（DoD）量測這些裸露地是被沖刷還是被土砂覆蓋，檢驗「植生退化」和「泥砂產出」的關係。</p>
+          <div class="s2-overview-toolbar">
+            <div id="saviTerrainTabs" class="s2-metric-tabs" aria-label="切換分析"></div>
+          </div>
+          <div class="s2-overview-grid">
+            <div id="saviTerrainFigure" class="savi-figure"></div>
+            <div id="saviTerrainBody"></div>
+          </div>
+          <details class="s2-tech"><summary>技術說明（資料、門檻、限制）</summary>
+            <p id="saviTerrainMethod"></p>
+          </details>
+        </article>
+
         <article class="s2-overview-card s2-mail-card">
           <div class="s2-card-head">
             <div>
@@ -907,6 +928,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260930-savi2"></script>
+    <script src="./app.js?v=20260930-savi4"></script>
   </body>
 </html>
