@@ -3879,10 +3879,15 @@ async function gisS2Render() {
   // 影像
   if (gisS2.overlay) { map.removeLayer(gisS2.overlay); gisS2.overlay = null; }
   const layer = document.querySelector("#gisS2Layer").value;
-  const url = layer && m.images?.[layer];
   const scenes = m.scenes || [];
   const notes = [];
-  if (layer && !url) notes.push(`${m.roc_month} 沒有此圖層（整月雲遮或資料不足），請切換月份。`);
+  const saviP = layer.startsWith("savi:") && typeof saviState !== "undefined" ? saviState.data?.periods.find((p) => p.key === layer.slice(5)) : null;
+  const url = saviP ? null : layer && m.images?.[layer];
+  if (saviP && GisAffineOverlay) {
+    gisS2.overlay = new GisAffineOverlay(saviP.images.class, saviState.data.overlay.corners_ll, { opacity: gisS2.opacity, interactive: false, pane: "gisS2Pane" }).addTo(map);
+    notes.push(`SAVI ${saviP.label}（${saviP.note}，${saviP.months_used.length} 個月中位數合成，不隨上方月份切換）：淺藍＝水體、橘＝裸露地、淺綠＝稀疏植生、深綠＝茂密植生；灰＝雲遮無資料。`);
+  } else if (layer.startsWith("savi:")) notes.push("SAVI 資料載入中，請稍候再選一次。");
+  if (layer && !saviP && !layer.startsWith("savi:") && !url) notes.push(`${m.roc_month} 沒有此圖層（整月雲遮或資料不足），請切換月份。`);
   if (url && GisAffineOverlay) {
     gisS2.overlay = new GisAffineOverlay(url, s2State.data.view.corners_ll, { opacity: gisS2.opacity, interactive: false, pane: "gisS2Pane" }).addTo(map);
     notes.push(`${GIS_LAYER_NOTE[layer] || ""}影像日期：${scenes.map((x) => x.date.slice(5).replace("-", "/")).join("、") || "—"}；白色＝雲遮。`);
@@ -4668,3 +4673,111 @@ function fanbShow() {
 document.querySelector("#fanbRefresh")?.addEventListener("click", fanbLoad);
 setTimeout(fanbLoad, 1500);                                                   // 開站即取一次，供通報報告與 AI 摘要使用
 fanbState.timer = setInterval(() => { if (!document.hidden) fanbLoad(); }, 10 * 60 * 1000);
+
+// ---- SAVI 植生覆蓋三期比較（sentinel2_monthly/s2_savi.py 產製）----
+var saviState = { data: null, view: "compare", layer: "class", zone: "watershed" };
+
+async function saviLoad() {
+  const badge = document.querySelector("#saviBadge");
+  if (!badge) return;
+  try {
+    const r = await fetch("./assets/sentinel2/savi/savi_compare.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(`回應 ${r.status}`);
+    saviState.data = await r.json();
+  } catch (e) {
+    badge.textContent = "尚未產製";
+    document.querySelector("#saviFigure").innerHTML = `<p class="muted-empty">SAVI 成果載入失敗：${s2Esc(e.message)}</p>`;
+    return;
+  }
+  const d = saviState.data;
+  const v = `?v=${encodeURIComponent(d.generated_at)}`;                      // 重新產製後避開瀏覽器舊圖快取
+  d.figure += v; d.figure_png += v;
+  d.periods.forEach((p) => { p.images.class += v; p.images.index += v; });
+  badge.textContent = `${d.periods.length} 期｜產製 ${d.generated_at.slice(0, 10)}`;
+  const og = document.querySelector("#gisSaviOpts");
+  if (og) og.innerHTML = d.periods.map((p) => `<option value="savi:${p.key}">SAVI ${s2Esc(p.label)}（${s2Esc(p.note)}）</option>`).join("");
+  saviRender();
+  if (document.querySelector("#gisS2Layer")?.value.startsWith("savi:") && typeof gisS2Render === "function") gisS2Render();
+}
+
+function saviRow(key, zone, code) {
+  return (saviState.data.stats[key] || []).find((r) => r.zone === zone && r.class === code) || {};
+}
+
+function saviRender() {
+  const d = saviState.data;
+  if (!d) return;
+  const P = d.periods;
+  const cls = d.classes;
+  const fmt = (v) => (v == null ? "—" : Number(v).toLocaleString("zh-TW", { maximumFractionDigits: 1 }));
+  document.querySelector("#saviTabs").innerHTML = [["compare", "三期並列圖"], ...P.map((p) => [p.key, `${p.label}（${p.note}）`])]
+    .map(([k, t]) => `<button type="button" data-savi-view="${k}" class="${saviState.view === k ? "active" : ""}">${s2Esc(t)}</button>`).join("");
+  document.querySelector("#saviZone").innerHTML = d.zones
+    .map((z) => `<button type="button" data-savi-zone="${z.key}" class="${saviState.zone === z.key ? "active" : ""}">${s2Esc(z.name)}</button>`).join("");
+
+  const fig = document.querySelector("#saviFigure");
+  if (saviState.view === "compare") {
+    fig.innerHTML = `<a href="${d.figure_png}" target="_blank" rel="noopener" title="開新分頁看高解析度原圖"><img src="${d.figure}" alt="馬太鞍溪集水區 SAVI 三期比較圖" loading="lazy" /></a>
+      <p class="s2-small">點圖可開啟高解析度原圖（可直接下載用於簡報或報告）。</p>`;
+  } else {
+    const p = P.find((x) => x.key === saviState.view) || P[0];
+    fig.innerHTML = `<div class="s2-seg savi-sub">${[["class", "分類圖"], ["index", "SAVI 數值"]]
+      .map(([k, t]) => `<button type="button" data-savi-layer="${k}" class="${saviState.layer === k ? "active" : ""}">${t}</button>`).join("")}</div>
+      <img src="${p.images[saviState.layer]}" alt="SAVI ${s2Esc(p.label)}" loading="lazy" />
+      <p class="s2-small">${s2Esc(p.label)}：${p.months_used.length} 個月中位數合成（${p.months_used.map((m) => m.slice(2).replace("-", "/")).join("、")}）；全流域 SAVI 平均 ${p.savi_mean}（P10 ${p.savi_p10}／P90 ${p.savi_p90}）。灰色＝雲遮無資料。
+      <button type="button" class="outline" data-savi-gis="${p.key}">在空間研判疊合</button></p>`;
+  }
+  document.querySelector("#saviLegend").innerHTML = saviState.view !== "compare" && saviState.layer === "index"
+    ? `<span><i class="ramp savi"></i>SAVI −0.1 → 0.7</span><span>門檻：&lt;${d.thresholds.bare} 裸露、≥${d.thresholds.dense} 茂密</span>`
+    : cls.map((c) => `<span><i class="sw" style="background:${c.color}"></i>${s2Esc(c.name)}</span>`).join("") + `<span><i class="sw" style="background:#e1e1e1"></i>雲遮無資料</span>`;
+
+  // 面積統計表
+  const z = saviState.zone;
+  const zn = d.zones.find((x) => x.key === z);
+  const last = P[P.length - 1]; const prev = P[P.length - 2];
+  const head = `<tr><th>類別</th>${P.map((p) => `<th>${s2Esc(p.label)}<br><small>${s2Esc(p.note)}</small></th>`).join("")}<th>災前→災後</th></tr>`;
+  const body = cls.map((c) => {
+    const a = saviRow(prev.key, z, c.code).ha; const b = saviRow(last.key, z, c.code).ha;
+    const dv = a == null || b == null ? null : b - a;
+    const tone = dv == null || Math.abs(dv) < 0.05 ? "" : (c.code === 2 ? (dv > 0 ? "up-bad" : "down-good") : c.code === 4 ? (dv < 0 ? "up-bad" : "down-good") : "");
+    return `<tr><td><i class="sw" style="background:${c.color}"></i>${s2Esc(c.name)}</td>${P.map((p) => { const r = saviRow(p.key, z, c.code); return `<td>${fmt(r.ha)} ha<br><small>${r.pct == null ? "—" : r.pct.toFixed(1) + "%"}</small></td>`; }).join("")}<td class="${tone}">${dv == null ? "—" : (dv > 0 ? "+" : "") + fmt(dv) + " ha"}</td></tr>`;
+  }).join("");
+  const nod = `<tr class="savi-nodata"><td>雲遮無資料</td>${P.map((p) => `<td>${fmt(saviRow(p.key, z, 0).ha)} ha</td>`).join("")}<td></td></tr>`;
+  document.querySelector("#saviTable").innerHTML = `<table class="s2-nw-table savi-table"><caption>${s2Esc(zn?.name || "")}面積統計（總面積 ${fmt(zn?.area_ha)} ha；百分比為占有效觀測）</caption><thead>${head}</thead><tbody>${body}${nod}</tbody></table>`;
+
+  // 轉移（災前→災後）
+  const t = d.transitions.find((x) => x.from === prev.key && x.to === last.key && x.zone === z);
+  const tbox = document.querySelector("#saviTrans");
+  if (!t) { tbox.innerHTML = ""; }
+  else {
+    const flows = [];
+    t.ha.forEach((row, i) => row.forEach((v, j) => { if (i !== j && v > 0) flows.push({ from: cls[i], to: cls[j], v }); }));
+    flows.sort((a, b) => b.v - a.v);
+    const loss = t.ha[3][1] + t.ha[2][1];
+    const gain = t.ha[1][2] + t.ha[1][3];
+    tbox.innerHTML = `<p class="s2-small">植生（稀疏＋茂密）轉為裸露地 <b class="t-red">${fmt(loss)} ha</b>；裸露地長回植生 <b class="t-green">${fmt(gain)} ha</b>。主要轉移：</p>
+      <ul class="savi-flows">${flows.slice(0, 5).map((f) => `<li><i class="sw" style="background:${f.from.color}"></i>${s2Esc(f.from.name)} → <i class="sw" style="background:${f.to.color}"></i>${s2Esc(f.to.name)}<b>${fmt(f.v)} ha</b></li>`).join("")}</ul>
+      <details class="s2-tech"><summary>完整轉移矩陣（列＝${s2Esc(prev.label)}，欄＝${s2Esc(last.label)}，ha）</summary>
+      <table class="s2-nw-table savi-table"><thead><tr><th></th>${cls.map((c) => `<th>${s2Esc(c.name)}</th>`).join("")}</tr></thead>
+      <tbody>${t.ha.map((row, i) => `<tr><th>${s2Esc(cls[i].name)}</th>${row.map((v, j) => `<td class="${i === j ? "diag" : ""}">${fmt(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></details>`;
+  }
+  document.querySelector("#saviDownloads").innerHTML = `下載：<a href="${d.downloads.area_csv}" download>面積統計表 CSV</a>｜<a href="${d.downloads.transition_csv}" download>轉移矩陣 CSV</a>｜<a href="${d.figure_png}" target="_blank" rel="noopener">比較圖 PNG</a>`;
+  document.querySelector("#saviMethod").textContent = `${d.formula}（Huete, 1988；NIR＝B08、Red＝B04，10 m）。流程：以 PySTAC 查詢 Microsoft Planetary Computer 的 Sentinel-2 L2A（雲量 < 90%），每月沿用本平台月監測的去雲規則（SCL＋藍光／短波紅外補判＋雲緣外擴 20 m）做月中位數合成；各期取流域有效覆蓋 ≥ 60% 的月份，逐像元中位數合成後分類。水體：${d.thresholds.water}；裸露地：SAVI < ${d.thresholds.bare}（約等同本平台 NDVI < 0.25 裸露定義）；稀疏植生：${d.thresholds.bare}–${d.thresholds.dense}；茂密植生：≥ ${d.thresholds.dense}。限制：陡坡背光面反射率低，SAVI 會偏低，部分陰坡森林可能被歸為稀疏植生；10 m 解析度無法分辨單株植生；分類為衛星判釋，需以 UAV 與現地查證。`;
+}
+
+document.querySelector("#saviCard")?.addEventListener("click", (e) => {
+  const v = e.target.closest("[data-savi-view]");
+  if (v) { saviState.view = v.dataset.saviView; saviRender(); return; }
+  const z = e.target.closest("[data-savi-zone]");
+  if (z) { saviState.zone = z.dataset.saviZone; saviRender(); return; }
+  const l = e.target.closest("[data-savi-layer]");
+  if (l) { saviState.layer = l.dataset.saviLayer; saviRender(); return; }
+  const g = e.target.closest("[data-savi-gis]");
+  if (g) {
+    const sel = document.querySelector("#gisS2Layer");
+    if (sel) sel.value = `savi:${g.dataset.saviGis}`;
+    showPage("gis");
+    setTimeout(() => { if (typeof gisS2Render === "function") gisS2Render(); spatialState.map?.invalidateSize(); }, 150);
+  }
+});
+setTimeout(saviLoad, 1200);

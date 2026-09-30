@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260929-fanb1" />
+    <link rel="stylesheet" href="./styles.css?v=20260930-savi1" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -392,6 +392,7 @@
                   <option value="dprev">植生變化：與上個月比</option>
                   <option value="recovery">崩積區植物恢復分區</option>
                   <option value="ndwi">NDWI 水域</option>
+                  <optgroup label="SAVI 植生覆蓋三期（固定期別，不隨月份）" id="gisSaviOpts"></optgroup>
                 </select>
               </label>
               <label class="s2-blend">透明<input id="gisS2Opacity" type="range" min="0" max="100" step="5" value="70" aria-label="Sentinel-2 圖層不透明度" />不透明</label>
@@ -728,6 +729,36 @@
           </div>
         </article>
 
+        <article class="s2-overview-card" id="saviCard">
+          <div class="s2-card-head">
+            <div>
+              <span class="section-kicker">SAVI · three-period comparison</span>
+              <h3>SAVI 植生覆蓋三期比較（土壤調整植生指數）</h3>
+            </div>
+            <span id="saviBadge" class="s2-observation-count">載入中</span>
+          </div>
+          <p class="s2-overview-note"><b>怎麼看這張圖？</b>把三個時期（長期基準、災前一年、潰決後一年）各自一整年的衛星影像去雲後合成，用 SAVI 指數把全集水區分成<b style="color:#1d8fc4">水體</b>、<b style="color:#c2710c">裸露地</b>、<b style="color:#4d9a1f">稀疏植生</b>、<b style="color:#2f7d32">茂密植生</b>四類，再比較各類面積的消長。每期都用 12 個月的中位數，已經排除季節差異。SAVI 會扣除裸土反光的影響，所以比 NDVI 更適合看植物稀疏、土石裸露的崩塌地。</p>
+          <div class="s2-overview-toolbar">
+            <div id="saviTabs" class="s2-metric-tabs" aria-label="切換期別"></div>
+            <div id="saviZone" class="s2-metric-tabs" aria-label="切換統計分區"></div>
+          </div>
+          <div class="s2-overview-grid">
+            <div>
+              <div id="saviFigure" class="savi-figure"></div>
+              <div id="saviLegend" class="s2-legend"></div>
+            </div>
+            <div>
+              <div id="saviTable"></div>
+              <h4 class="s2-sub">災前 → 潰決後：土地覆蓋轉移</h4>
+              <div id="saviTrans"></div>
+              <p id="saviDownloads" class="s2-small"></p>
+            </div>
+          </div>
+          <details class="s2-tech"><summary>技術說明（公式、門檻、流程）</summary>
+            <p id="saviMethod"></p>
+          </details>
+        </article>
+
         <article class="s2-overview-card s2-mail-card">
           <div class="s2-card-head">
             <div>
@@ -876,6 +907,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260929-fanb3"></script>
+    <script src="./app.js?v=20260930-savi2"></script>
   </body>
 </html>

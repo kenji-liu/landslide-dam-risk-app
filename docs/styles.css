@@ -2658,3 +2658,21 @@ body.s2-lb-open { overflow: hidden; }
 .s2-metric-card.orange strong { color: #b45309; }
 .s2-metric-card.grey::before { background: #94a3b8; }
 @media (max-width: 1180px) { .fanb-grid { grid-template-columns: 1fr; } }
+
+/* SAVI 三期比較 */
+.savi-figure img { display: block; width: 100%; height: auto; border: 1px solid #d5dfe3; border-radius: 10px; background: #fff; }
+.savi-figure .savi-sub { margin-bottom: 8px; }
+.s2-legend .ramp.savi { background: linear-gradient(90deg, #8c5a1e, #e3b56a, #f3e3ad, #cfe3a8, #5fae5f, #0b5d1e); }
+.savi-table { margin-bottom: 10px; }
+.savi-table caption { caption-side: top; text-align: left; font-size: 12.5px; color: #3d5563; padding-bottom: 6px; }
+.savi-table td, .savi-table th { text-align: center; }
+.savi-table td:first-child { text-align: left; white-space: nowrap; }
+.savi-table .sw, .savi-flows .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; border: 1px solid rgba(0,0,0,.15); }
+.savi-table small { color: #64748b; }
+.savi-table .up-bad { color: #b91c1c; font-weight: 700; }
+.savi-table .down-good { color: #15803d; font-weight: 700; }
+.savi-table .diag { color: #94a3b8; }
+.savi-table .savi-nodata td { color: #94a3b8; font-size: 12px; }
+.savi-flows { list-style: none; padding: 0; margin: 4px 0 10px; font-size: 13px; }
+.savi-flows li { display: flex; align-items: center; gap: 2px; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; }
+.savi-flows li b { margin-left: auto; }
