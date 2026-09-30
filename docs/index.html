@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>堰塞湖緊急調查與風險評估平台</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=20260930-savi3" />
+    <link rel="stylesheet" href="./styles.css?v=20260930-rusle1" />
   </head>
   <body>
     <nav class="sidebar" id="sidebar">
@@ -759,24 +759,34 @@
           </details>
         </article>
 
-        <article class="s2-overview-card" id="saviTerrainCard" hidden>
+        <article class="s2-overview-card" id="rusleCard" hidden>
           <div class="s2-card-head">
             <div>
-              <span class="section-kicker">SAVI × terrain × DoD</span>
-              <h3>延伸分析：坡度坡向退化熱點 × DoD 沖淤比對</h3>
+              <span class="section-kicker">RUSLE · soil loss</span>
+              <h3>土壤流失量變化（RUSLE × SAVI 植生覆蓋）</h3>
             </div>
-            <span id="saviTerrainBadge" class="s2-observation-count"></span>
+            <span id="rusleBadge" class="s2-observation-count"></span>
           </div>
-          <p class="s2-overview-note"><b>這在看什麼？</b>把上方 SAVI「災前一年 → 潰決後一年」由植生變成裸露地的位置，疊上事件前的光達地形（內政部 20 m DTM）：看哪些坡度、坡向最容易退化，並列出面積 ≥ 1 ha 的<b>退化熱點</b>；在有 UAV 地形的壩區，再用地形差分（DoD）量測這些裸露地是被沖刷還是被土砂覆蓋，檢驗「植生退化」和「泥砂產出」的關係。</p>
-          <div class="s2-overview-toolbar">
-            <div id="saviTerrainTabs" class="s2-metric-tabs" aria-label="切換分析"></div>
-          </div>
+          <div id="rusleTiles" class="rusle-tiles"></div>
+          <p class="s2-overview-note"><b>怎麼算的？</b>依水土保持技術規範第 35 條的通用土壤流失公式：<b>土壤流失量 ＝ 降雨（Rm）× 土壤（Km）× 坡長坡度（LS）× 植生覆蓋（C）× 水保處理（P）</b>。同一個集水區的三個時期，雨量、土壤、地形都一樣，只有「植生覆蓋 C」會變：用上方 SAVI 分類給值，<b>森林 0.01、稀疏植生 0.1、裸露地 1.0</b>（裸露地的沖蝕量約是森林的 100 倍）。所以把三期相比，就能看出植生流失讓土壤流失增加了幾倍、增加在哪裡。</p>
           <div class="s2-overview-grid">
-            <div id="saviTerrainFigure" class="savi-figure"></div>
-            <div id="saviTerrainBody"></div>
+            <div id="rusleFigure" class="savi-figure"></div>
+            <div>
+              <div id="rusleTable"></div>
+              <div class="rusle-calc">
+                <strong>換算成公噸</strong>
+                <p class="s2-small">Rm、Km 依規定以水保署「行動水保服務網」查詢值為準，本平台不預設。查到後填入即可換算各分區每年土壤流失量。</p>
+                <div class="rusle-calc-row">
+                  <label>Rm<input id="rusleRm" type="number" min="0" step="any" inputmode="decimal" placeholder="例：查詢值" /></label>
+                  <label>Km<input id="rusleKm" type="number" min="0" step="any" inputmode="decimal" placeholder="例：查詢值" /></label>
+                </div>
+                <div id="rusleTons" aria-live="polite"></div>
+              </div>
+              <p id="rusleDownloads" class="s2-small"></p>
+            </div>
           </div>
-          <details class="s2-tech"><summary>技術說明（資料、門檻、限制）</summary>
-            <p id="saviTerrainMethod"></p>
+          <details class="s2-tech"><summary>技術說明（公式、參數、限制）</summary>
+            <p id="rusleMethod"></p>
           </details>
         </article>
 
@@ -928,6 +938,6 @@
 
     <button class="ai-fab" data-page-target="ai">AI</button>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260930-savi4"></script>
+    <script src="./app.js?v=20260930-rusle2"></script>
   </body>
 </html>

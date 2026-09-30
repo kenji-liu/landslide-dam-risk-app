@@ -4698,20 +4698,20 @@ async function saviLoad() {
     key: p.key, label: `SAVI ${p.label}（${p.note}）`, url: p.images.class, corners_ll: d.overlay.corners_ll,
     desc: `SAVI ${p.label}（${p.note}，${p.months_used.length} 個月中位數合成，不隨上方月份切換）：淺藍＝水體、橘＝裸露地、淺綠＝稀疏植生、深綠＝茂密植生；灰＝雲遮無資料。`
   }));
-  try {                                                                       // 延伸分析（s2_savi_terrain.py），沒有也不影響三期比較
-    const r = await fetch("./assets/sentinel2/savi/savi_terrain.json", { cache: "no-store" });
+  try {                                                                       // RUSLE 土壤流失（s2_rusle.py），沒有也不影響三期比較
+    const r = await fetch("./assets/sentinel2/savi/rusle.json", { cache: "no-store" });
     if (r.ok) {
-      const t = await r.json();
-      const tv = `?v=${encodeURIComponent(t.generated_at)}`;
-      t.terrain.figure += tv; t.terrain.figure_png += tv; t.dod.figure += tv; t.dod.figure_png += tv;
-      saviState.terrain = t;
-      t.layers.forEach((l) => saviState.layers.push({ key: l.key, label: l.label, url: l.url + tv, corners_ll: l.corners_ll, desc: l.note }));
+      const u = await r.json();
+      const uv = `?v=${encodeURIComponent(u.generated_at)}`;
+      u.figure += uv; u.figure_png += uv;
+      saviState.rusle = u;
+      u.layers.forEach((l) => saviState.layers.push({ key: l.key, label: l.label, url: l.url + uv, corners_ll: l.corners_ll, desc: l.note }));
     }
-  } catch (e) { /* 延伸分析尚未產製 */ }
+  } catch (e) { /* 尚未產製 */ }
   const og = document.querySelector("#gisSaviOpts");
   if (og) og.innerHTML = saviState.layers.map((l) => `<option value="savi:${l.key}">${s2Esc(l.label)}</option>`).join("");
   saviRender();
-  saviTerrainRender();
+  rusleRender();
   if (document.querySelector("#gisS2Layer")?.value.startsWith("savi:") && typeof gisS2Render === "function") gisS2Render();
 }
 
@@ -4797,79 +4797,56 @@ document.querySelector("#saviCard")?.addEventListener("click", (e) => {
 });
 setTimeout(saviLoad, 1200);
 
-// ---- SAVI 延伸分析：坡度坡向退化熱點 × DoD（sentinel2_monthly/s2_savi_terrain.py 產製）----
-function saviTerrainRender() {
-  const card = document.querySelector("#saviTerrainCard");
-  const t = saviState.terrain;
-  if (!card || !t) return;
+// ---- RUSLE 土壤流失量變化（sentinel2_monthly/s2_rusle.py 產製；C 因子由 SAVI 分類給值）----
+function rusleRender() {
+  const card = document.querySelector("#rusleCard");
+  const u = saviState.rusle;
+  if (!card || !u) return;
   card.hidden = false;
-  const tab = saviState.terrainTab || "terrain";
-  const fmt = (v, d = 1) => (v == null ? "—" : Number(v).toLocaleString("zh-TW", { maximumFractionDigits: d }));
-  const wan = (m3) => fmt(Math.abs(m3) / 1e4, 0);
-  document.querySelector("#saviTerrainBadge").textContent = `熱點 ${t.terrain.hotspots.length} 處｜DoD ${fmt(t.dod.meta.footprint_ha, 0)} ha`;
-  document.querySelector("#saviTerrainTabs").innerHTML = [["terrain", "坡度坡向 × 退化熱點"], ["dod", "DoD 沖淤 × 植生轉移"]]
-    .map(([k, s]) => `<button type="button" data-savi-ttab="${k}" class="${tab === k ? "active" : ""}">${s}</button>`).join("");
-  const f = tab === "terrain" ? t.terrain : t.dod;
-  document.querySelector("#saviTerrainFigure").innerHTML = `<a href="${f.figure_png}" target="_blank" rel="noopener" title="開新分頁看高解析度原圖"><img src="${f.figure}" alt="${tab === "terrain" ? "坡度坡向與退化熱點圖" : "DoD 與 SAVI 交叉比對圖"}" loading="lazy" /></a>
-    <p class="s2-small">點圖可開啟高解析度原圖。<button type="button" class="outline" data-savi-gis="${tab === "terrain" ? "newbare" : "dod"}">在空間研判疊合${tab === "terrain" ? "植生→裸露" : " DoD"}</button></p>`;
-  const body = document.querySelector("#saviTerrainBody");
-  if (tab === "terrain") {
-    const tt = t.terrain.totals;
-    const hill = t.terrain.slope.filter((r) => ["四級坡", "五級坡", "六級坡", "七級坡"].includes(r.class));
-    const lo = hill.reduce((a, b) => (b.newbare_pct_other < a.newbare_pct_other ? b : a));
-    const hi = hill.reduce((a, b) => (b.newbare_pct_other > a.newbare_pct_other ? b : a));
-    const asp = t.terrain.aspect.slice(0, 8).sort((a, b) => b.newbare_pct_other - a.newbare_pct_other).slice(0, 2);
-    body.innerHTML = `<div class="savi-plain">
-        <p>潰決後一年，全集水區植生轉為裸露地 <b class="t-red">${fmt(tt.newbare_ha, 0)} ha</b>，其中 ${fmt(tt.newbare_ha - tt.newbare_ha_other, 0)} ha 在崩積區、殘壩區、湖域與下游河道（事件區），<b>事件區外 ${fmt(tt.newbare_ha_other, 0)} ha</b>；同期裸露地長回植生只有 ${fmt(tt.regrow_ha, 0)} ha。</p>
-        <p>事件區外的坡面（四級坡以上），新增裸露比率最低是${lo.class} ${lo.newbare_pct_other}%，最高是${hi.class} ${hi.newbare_pct_other}%；坡向以<b>${asp.map((a) => a.aspect).join("、")}</b>向最高。一、二級坡的新增裸露多為河道擴寬與堆積，不是坡面崩塌。</p></div>
-      <table class="s2-nw-table savi-table"><caption>各級坡（水保七級坡）裸露與退化</caption>
-        <thead><tr><th>坡度分級</th><th>面積</th><th>裸露率<br><small>災前→潰決後</small></th><th>植生→裸露</th><th>事件區外<br>退化比率</th></tr></thead>
-        <tbody>${t.terrain.slope.map((r) => `<tr><td>${r.class}<br><small>${r.range}</small></td><td>${fmt(r.area_ha, 0)} ha</td><td>${fmt(r.bare_pct_p2)}% → <b>${fmt(r.bare_pct_p3)}%</b></td><td>${fmt(r.newbare_ha)} ha</td><td>${fmt(r.newbare_pct_other, 2)}%</td></tr>`).join("")}</tbody></table>
-      <h4 class="s2-sub">退化熱點（植生→裸露區塊 ≥ 1 ha，依面積排序）</h4>
-      <table class="s2-nw-table savi-table savi-hot"><thead><tr><th>#</th><th>面積</th><th>平均坡度</th><th>坡向</th><th>分區／類型</th><th></th></tr></thead>
-        <tbody>${t.terrain.hotspots.slice(0, 15).map((h) => `<tr><td>${h.id}</td><td>${fmt(h.area_ha)} ha</td><td>${fmt(h.slope_mean_pct, 0)}%<br><small>${h.slope_mean_deg}°</small></td><td>${s2Esc(h.aspect)}</td><td>${s2Esc(h.zone)}<br><small>${s2Esc(h.kind)}</small></td><td><button type="button" class="outline" data-savi-hot="${h.id}" title="在空間研判定位此熱點">定位</button></td></tr>`).join("")}</tbody></table>
-      <p class="s2-small">共 ${t.terrain.hotspots.length} 處，完整清單見 CSV。下載：<a href="${t.terrain.csv[0]}" download>坡度坡向統計 CSV</a>｜<a href="${t.terrain.csv[1]}" download>熱點清單 CSV</a></p>`;
-    document.querySelector("#saviTerrainMethod").textContent = "坡度、坡向由內政部 2025 年版 20 m DTM 計算（LiDAR，本區測量 2022-07～2023-11，事件前裸地高程，TWVD2001），重取樣到 Sentinel-2 的 10 m 網格；坡度分級採水保七級坡（一級 ≤5%、二級 5–15%、三級 15–30%、四級 30–40%、五級 40–55%、六級 55–100%、七級 >100%）。退化＝SAVI 災前一年（2024/07–2025/06）為稀疏或茂密植生、潰決後一年（2025/10–2026/09）為裸露地。熱點＝退化像元 8 連通區塊 ≥ 1 ha，依平均坡度分為陡坡崩塌裸露（≥55%）、中坡裸露（30–55%）、緩坡／河道堆積（<30%），位於湖域或殘壩區者依分區另列。事件區＝崩積區、殘壩區、2025 湖域最大範圍、下游河道區。限制：20 m DTM 會平滑小尺度地形；SAVI 為年中位數合成，10 m 解析度無法辨識單株；熱點為衛星初篩，需現地查證。";
-  } else {
-    const d = t.dod; const m = d.meta; const tot = d.total;
-    const vb = d.rows.find((r) => r.key === "veg_bare");
-    const eroShare = vb && tot.erosion_m3 ? Math.round((100 * vb.erosion_m3) / tot.erosion_m3) : null;
-    const top = d.bins[d.bins.length - 1];
-    body.innerHTML = `<div class="savi-plain">
-        <p>UAV 涵蓋壩區 ${fmt(m.footprint_ha, 0)} ha，其中潰決後為裸露地、量得到真實地表的 <b>${fmt(tot.area_ha, 0)} ha</b>：淤積 <b style="color:#2166ac">${wan(tot.deposition_m3)} 萬 m³</b>、沖蝕 <b class="t-red">${wan(tot.erosion_m3)} 萬 m³</b>（LoD ±${m.lod_m} m）。這一帶是壩體與崩積堆積區，崩塌源頭大多不在 UAV 範圍內，所以以淤積為主。</p>
-        <p><b>植生退化和泥砂的關係：</b>沖蝕量有 ${eroShare}% 發生在「植生→裸露」的像元；潰決期間（09/20→09/30）沖蝕 ${wan(d.breach.erosion_m3)} 萬 m³，其中 ${d.breach.erosion_post_bare_pct}% 落在潰決後的裸露地，表示 <b>SAVI 裸露範圍可當作泥砂來源與堆積區的代理指標</b>。但植生流失的程度和土砂厚度只有弱相關（Spearman ρ = ${d.spearman.rho}）：最厚的堆積（|dZ| 中位數 ${fmt(top.abs_dz_median, 0)} m）在災前就已是裸露河床的谷底，所以<b>不能用 ΔSAVI 大小推估沖淤量</b>，體積仍要靠 DoD。</p></div>
-      <table class="s2-nw-table savi-table"><caption>潰決後裸露地的沖淤（依災前植生分組）</caption>
-        <thead><tr><th>類別</th><th>面積</th><th>沖蝕</th><th>淤積</th><th>dZ 中位數</th></tr></thead>
-        <tbody>${[...d.rows, tot].map((r) => `<tr class="${r.key === "all" ? "savi-total" : ""}"><td>${s2Esc(r.name)}</td><td>${fmt(r.area_ha, 0)} ha</td><td>${wan(r.erosion_m3)} 萬 m³<br><small>${fmt(r.erosion_ha)} ha</small></td><td>${wan(r.deposition_m3)} 萬 m³<br><small>${fmt(r.deposition_ha)} ha</small></td><td>${r.dz_median > 0 ? "+" : ""}${fmt(r.dz_median)} m</td></tr>`).join("")}</tbody></table>
-      <table class="s2-nw-table savi-table"><caption>植生流失程度（ΔSAVI）× 地形變化</caption>
-        <thead><tr><th>ΔSAVI</th><th>面積</th><th>沖蝕</th><th>淤積</th><th>|dZ| 中位數</th></tr></thead>
-        <tbody>${d.bins.filter((b) => b.erosion_pct != null).map((b) => `<tr><td>${b.bin}</td><td>${fmt(b.area_ha, 0)} ha</td><td>${b.erosion_pct}%</td><td>${b.deposition_pct}%</td><td>${fmt(b.abs_dz_median, 0)} m</td></tr>`).join("")}</tbody></table>
-      <p class="s2-small">不計入：植生維持 ${fmt(d.excluded.veg_keep_ha, 0)} ha（DSM 含樹冠，dZ 中位數 +${d.excluded.veg_keep_dz_median} m 多為樹高）、潰決後水體 ${fmt(d.excluded.water_ha, 0)} ha（量到水面）。下載：<a href="${d.csv}" download>DoD × SAVI 統計 CSV</a></p>`;
-    document.querySelector("#saviTerrainMethod").textContent = `dZ ＝ UAV 2025-09-30 DSM（5 m，面積平均到 10 m）− 內政部 20 m DTM（LiDAR 2022–23，裸地）− 對位偏移；正值＝淤積、負值＝沖蝕。兩者同為 TWD97／TWVD2001。對位偏移 ${m.offset_m >= 0 ? "+" : ""}${m.offset_m} m 取自壩區事件範圍外 100 m、潰決後為稀疏植生的穩定地表（${m.stable_px} 個 10 m 像元），穩健標準差 ${m.rsd_m} m，LoD ＝ max(2 m, 1.96σ) ＝ ±${m.lod_m} m，|dZ| 在 LoD 內視為無顯著變化。DSM 含樹冠，只有潰決後為裸露地的像元量得到真實地表，因此沖淤量只在這些像元計算。潰決期間 DoD 為 09/30 − 09/20 兩期 UAV DSM（偏移 ${d.breach.offset_m} m、LoD ±${d.breach.lod_m} m）。限制：未經地面控制點檢核、20 m DTM 在陡坡有內插誤差，體積僅供趨勢與量級判讀，不宜作為正式土方量。`;
-  }
+  const fmt = (v, d = 0) => (v == null ? "—" : Number(v).toLocaleString("zh-TW", { maximumFractionDigits: d }));
+  const P = u.periods;
+  const pre = P[P.length - 2].key; const post = P[P.length - 1].key;
+  const all = u.zones.find((z) => z.zone === "all");
+  const zs = u.zones.filter((z) => z.zone !== "all");
+  const top = zs.slice().sort((a, b) => b.increase - a.increase)[0];
+  const bare = u.contrib.find((c) => c.class === "裸露地");
+  document.querySelector("#rusleBadge").textContent = `產製 ${u.generated_at.slice(0, 10)}`;
+  document.querySelector("#rusleTiles").innerHTML = `
+    <div class="rusle-tile"><span>潰決後一年 vs 災前一年</span><strong class="t-red">${u.ratio.toFixed(1)} 倍</strong><small>全集水區土壤流失量（是 2018 年的 ${u.ratio_vs_p1.toFixed(1)} 倍）</small></div>
+    <div class="rusle-tile"><span>增加最多的地方</span><strong>${s2Esc(top.name)}</strong><small>占全部增加量 ${top.increase_share}%（該區變成 ${top.ratio.toFixed(1)} 倍）</small></div>
+    <div class="rusle-tile"><span>裸露地的影響</span><strong>${bare.area_pct}% 面積</strong><small>卻產生 ${bare.potential_pct}% 的土壤流失</small></div>`;
+  document.querySelector("#rusleFigure").innerHTML = `<a href="${u.figure_png}" target="_blank" rel="noopener" title="開新分頁看高解析度原圖"><img src="${u.figure}" alt="RUSLE 土壤流失潛勢三期比較圖" loading="lazy" /></a>
+    <p class="s2-small">顏色越紅＝土壤越容易被沖走。點圖可開高解析度原圖。<button type="button" class="outline" data-savi-gis="rusle_${post}">在空間研判疊合潰決後流失分布</button></p>`;
+  document.querySelector("#rusleTable").innerHTML = `<table class="s2-nw-table savi-table"><caption>各分區土壤流失（相對值；災前一年＝比較基準）</caption>
+    <thead><tr><th>分區</th><th>面積</th><th>災前一年</th><th>潰決後一年</th><th>變成</th><th>占增加量</th></tr></thead>
+    <tbody>${zs.map((z) => `<tr><td>${s2Esc(z.name)}</td><td>${fmt(z.area_ha)} ha</td><td>${fmt(z["sum_" + pre])}</td><td>${fmt(z["sum_" + post])}</td><td class="${z.ratio >= 2 ? "up-bad" : ""}">${z.ratio ? z.ratio.toFixed(1) + " 倍" : "—"}</td><td>${z.increase_share ?? "—"}%</td></tr>`).join("")}
+    <tr class="savi-total"><td>全集水區</td><td>${fmt(all.area_ha)} ha</td><td>${fmt(all["sum_" + pre])}</td><td>${fmt(all["sum_" + post])}</td><td class="up-bad">${all.ratio.toFixed(1)} 倍</td><td>100%</td></tr></tbody></table>`;
+  document.querySelector("#rusleDownloads").innerHTML = `下載：<a href="${u.csv}" download>分區統計 CSV</a>｜<a href="${u.figure_png}" target="_blank" rel="noopener">比較圖 PNG</a>`;
+  const c = u.c_values;
+  document.querySelector("#rusleMethod").textContent = `Am ＝ Rm × Km × L × S × C × P（公噸／公頃／年；水土保持技術規範第 35 條）。C（覆蓋與管理因子）由 SAVI 年中位數分類給值：茂密植生 ${c["茂密植生"]}、稀疏植生 ${c["稀疏植生"]}、裸露地 ${c["裸露地"]}（USLE 定義之連續休耕裸地）、水體 0；參考 Wischmeier & Smith (1978) USDA Agriculture Handbook 537 表列：未擾動森林約 0.0001–0.009、部分覆蓋草生／灌叢約 0.02–0.2。L ＝ (λ/22.13)^0.5，λ 以內政部 2025 年版 20 m DTM（LiDAR 2022–23，事件前）D8 流向累積求得，上限 ${u.lambda_max} m；S ＝ 65.41 sin²θ ＋ 4.56 sinθ ＋ 0.065；P ＝ 1（天然集水區）。表中「相對值」＝ Σ(L×S×C×面積 ha)，三期 Rm、Km 相同，因此倍數與占比不受 Rm、Km 影響；乘上 Rm×Km 即為公噸／年。限制：USLE 試驗資料多為坡長 130 m 內、緩坡，本區多為 55% 以上陡坡，絕對量會偏高，宜看倍數與分布；只估坡面沖蝕，不含崩塌土方與河道沖刷；C 以四類給值，未反映同類內的覆蓋差異。`;
+  rusleTons();
 }
 
-document.querySelector("#saviTerrainCard")?.addEventListener("click", (e) => {
-  const tb = e.target.closest("[data-savi-ttab]");
-  if (tb) { saviState.terrainTab = tb.dataset.saviTtab; saviTerrainRender(); return; }
-  const h = e.target.closest("[data-savi-hot]");
-  if (h) {
-    const s = saviState.terrain.terrain.hotspots.find((x) => x.id === Number(h.dataset.saviHot));
-    const sel = document.querySelector("#gisS2Layer");
-    if (sel) sel.value = "savi:newbare";
-    if (s) gisOpenAt(s.lat, s.lon, `退化熱點 #${s.id}｜${s.area_ha} ha｜坡度 ${s.slope_mean_pct}%`);
-    return;
-  }
+function rusleTons() {
+  const u = saviState.rusle;
+  const box = document.querySelector("#rusleTons");
+  if (!u || !box) return;
+  const rm = Number(document.querySelector("#rusleRm").value); const km = Number(document.querySelector("#rusleKm").value);
+  if (!(rm > 0 && km > 0)) { box.innerHTML = ""; return; }
+  const P = u.periods; const f = rm * km;
+  const fmt = (v, d = 1) => Number(v).toLocaleString("zh-TW", { maximumFractionDigits: d });
+  box.innerHTML = `<table class="s2-nw-table savi-table"><caption>每年土壤流失量（萬公噸／年）＝ 相對值 × Rm × Km ÷ 10⁴</caption>
+    <thead><tr><th>分區</th>${P.map((p) => `<th>${s2Esc(p.note)}</th>`).join("")}<th>潰決後平均<br><small>公噸／公頃／年</small></th></tr></thead>
+    <tbody>${u.zones.map((z) => `<tr class="${z.zone === "all" ? "savi-total" : ""}"><td>${s2Esc(z.name)}</td>${P.map((p) => `<td>${fmt((z["sum_" + p.key] * f) / 1e4)}</td>`).join("")}<td>${fmt((z["sum_" + P[P.length - 1].key] * f) / z.area_ha, 0)}</td></tr>`).join("")}</tbody></table>
+    <p class="s2-small">本區多為陡坡，USLE 絕對量易偏高，請與實測輸砂或 DEM 差分結果對照後使用。</p>`;
+}
+
+document.querySelector("#rusleCard")?.addEventListener("input", (e) => { if (e.target.matches("#rusleRm, #rusleKm")) rusleTons(); });
+document.querySelector("#rusleCard")?.addEventListener("click", (e) => {
   const g = e.target.closest("[data-savi-gis]");
-  if (g) {
-    const sel = document.querySelector("#gisS2Layer");
-    if (sel) sel.value = `savi:${g.dataset.saviGis}`;
-    showPage("gis");
-    setTimeout(() => {
-      if (typeof gisS2Render === "function") gisS2Render();
-      const map = spatialState.map;
-      map?.invalidateSize();
-      if (g.dataset.saviGis === "dod") map?.setView([23.6992, 121.3095], 15);
-    }, 150);
-  }
+  if (!g) return;
+  const sel = document.querySelector("#gisS2Layer");
+  if (sel) sel.value = `savi:${g.dataset.saviGis}`;
+  showPage("gis");
+  setTimeout(() => { if (typeof gisS2Render === "function") gisS2Render(); spatialState.map?.invalidateSize(); }, 150);
 });

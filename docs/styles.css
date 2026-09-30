@@ -2682,3 +2682,17 @@ body.s2-lb-open { overflow: hidden; }
 #saviTerrainBody .savi-plain p { margin: 0 0 8px; font-size: 13.5px; line-height: 1.65; }
 .savi-plain { background: #f5f8f7; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
 .savi-hot th, .savi-hot td { padding-left: 4px; padding-right: 4px; }
+
+/* RUSLE 土壤流失 */
+.rusle-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 4px 0 12px; }
+.rusle-tile { background: #fbf7f2; border: 1px solid #efe2d2; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.rusle-tile span { font-size: 12.5px; color: #64748b; }
+.rusle-tile strong { font-size: 26px; line-height: 1.2; color: #1f2937; }
+.rusle-tile strong.t-red { color: #b91c1c; }
+.rusle-tile small { font-size: 12.5px; color: #475569; }
+.rusle-calc { margin: 10px 0; padding: 12px 14px; border: 1px dashed #cbd5e1; border-radius: 10px; }
+.rusle-calc p { margin: 4px 0 8px; }
+.rusle-calc-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.rusle-calc-row label { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; }
+.rusle-calc-row input { width: 130px; }
+@media (max-width: 720px) { .rusle-tiles { grid-template-columns: 1fr; } }
