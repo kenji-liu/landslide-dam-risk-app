@@ -1,24 +1,25 @@
 {
-  "updated": "2026-10-11 08:00",
-  "processed_at": "2026-10-11 08:00",
+  "updated": "2026-10-12 08:27",
+  "processed_at": "2026-10-12 08:27",
   "freshness": {
     "status": "current",
     "label": "資料在有效期內",
     "latest_acquisition": "2026-09-28",
     "latest_pair": "2026-09-16→2026-09-28",
-    "latency_days": 13,
+    "latency_days": 14,
     "stale_after_days": 14,
-    "message": "最後觀測距今 13 天，尚未超過 14 天門檻。"
+    "message": "最後觀測距今 14 天，尚未超過 14 天門檻。"
   },
   "ingest": {
-    "checked_at": "2026-10-11T08:00:18+08:00",
-    "status": "ready",
-    "message": "最新相鄰配對 2026-09-16→2026-09-28 已在本機，可供監測分析。",
-    "latest_available_acquisition": "2026-09-28",
+    "checked_at": "2026-10-12T08:27:04+08:00",
+    "status": "submitted",
+    "message": "已送出最新相鄰配對 2026-09-28→2026-10-10；下次排程將輪詢與下載。",
+    "latest_available_acquisition": "2026-10-10",
     "latest_target_pair": [
-      "20260916",
-      "20260928"
-    ]
+      "20260928",
+      "20261010"
+    ],
+    "job_status": "PENDING"
   },
   "thresholds": {
     "yellow_db": -10.0,
