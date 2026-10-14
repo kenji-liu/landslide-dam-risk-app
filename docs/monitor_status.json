@@ -1,25 +1,24 @@
 {
-  "updated": "2026-10-13 08:00",
-  "processed_at": "2026-10-13 08:00",
+  "updated": "2026-10-14 08:00",
+  "processed_at": "2026-10-14 08:00",
   "freshness": {
     "status": "current",
     "label": "資料在有效期內",
     "latest_acquisition": "2026-10-10",
     "latest_pair": "2026-09-28→2026-10-10",
-    "latency_days": 3,
+    "latency_days": 4,
     "stale_after_days": 14,
-    "message": "最後觀測距今 3 天，尚未超過 14 天門檻。"
+    "message": "最後觀測距今 4 天，尚未超過 14 天門檻。"
   },
   "ingest": {
-    "checked_at": "2026-10-13T08:00:11+08:00",
+    "checked_at": "2026-10-14T08:00:13+08:00",
     "status": "ready",
-    "message": "HyP3工作已完成並下載：2026-09-28→2026-10-10。",
+    "message": "最新相鄰配對 2026-09-28→2026-10-10 已在本機，可供監測分析。",
     "latest_available_acquisition": "2026-10-10",
     "latest_target_pair": [
       "20260928",
       "20261010"
-    ],
-    "job_status": "SUCCEEDED"
+    ]
   },
   "thresholds": {
     "yellow_db": -10.0,
