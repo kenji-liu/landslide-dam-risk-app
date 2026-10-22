@@ -1,24 +1,19 @@
 {
-  "updated": "2026-10-21 08:00",
-  "processed_at": "2026-10-21 08:00",
+  "updated": "2026-10-22 10:50",
+  "processed_at": "2026-10-22 10:50",
   "freshness": {
-    "status": "current",
-    "label": "資料在有效期內",
+    "status": "warning",
+    "label": "取得流程異常",
     "latest_acquisition": "2026-10-16",
     "latest_pair": "2026-10-10→2026-10-16",
-    "latency_days": 5,
+    "latency_days": 6,
     "stale_after_days": 14,
-    "message": "最後觀測距今 5 天，尚未超過 14 天門檻。"
+    "message": "影像取得失敗：SSLError: HTTPSConnectionPool(host='cmr.earthdata.nasa.gov', port=443): Max retries exceeded with url: /search/granules.umm_json (Caused by SSLError(SSLCertVerificationError(1, \"[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'cmr.earthdata.nasa.gov'. (_ssl.c:1016)\")))"
   },
   "ingest": {
-    "checked_at": "2026-10-21T08:00:19+08:00",
-    "status": "ready",
-    "message": "最新相鄰配對 2026-10-10→2026-10-16 已在本機，可供監測分析。",
-    "latest_available_acquisition": "2026-10-16",
-    "latest_target_pair": [
-      "20261010",
-      "20261016"
-    ]
+    "checked_at": "2026-10-22T10:48:24+08:00",
+    "status": "error",
+    "message": "影像取得失敗：SSLError: HTTPSConnectionPool(host='cmr.earthdata.nasa.gov', port=443): Max retries exceeded with url: /search/granules.umm_json (Caused by SSLError(SSLCertVerificationError(1, \"[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'cmr.earthdata.nasa.gov'. (_ssl.c:1016)\")))"
   },
   "thresholds": {
     "yellow_db": -10.0,
