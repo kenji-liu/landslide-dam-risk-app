@@ -26,6 +26,7 @@
       <button class="nav-item" data-page="monitor"><span>雷</span> SAR監測</button>
       <button class="nav-item" data-page="fanb"><span>林</span> 林保署監測</button>
       <button class="nav-item" data-page="sentinel2"><span>葉</span> Sentinel-2</button>
+      <button class="nav-item" data-page="sediment"><span>沖</span> 土砂變遷</button>
       <button class="nav-item" data-page="report"><span>▨</span> 通報報告</button>
       <button class="nav-item" data-page="ai"><span>AI</span> 專家摘要</button>
       <div class="sidebar-footer">水土保持 · UAV · GIS · 風險治理</div>
@@ -833,6 +834,47 @@
           <div id="s2Basis"></div>
         </article>
         <p id="s2Source" class="s2-source"></p>
+      </section>
+
+      <section class="page" id="sediment">
+        <div class="toolbar-card">
+          <div>
+            <h2>土砂變遷（DEM 差分）</h2>
+            <p>馬太鞍溪堰塞湖潰決後（2025/9/25–2026/9/14）的土砂沖淤、流向與河道縱斷面變化。以 A 崩積區、B 殘壩區、C 山區河道、D 治理界點下游河床分區，呈現累積沖淤、殘壩區每日流失速率與土砂收支。</p>
+          </div>
+          <div class="toolbar-actions">
+            <a class="terrain-open-link" href="https://mataian-dam-sediment-dashboard.pages.dev/" target="_blank" rel="noopener">開啟原儀表板 ↗</a>
+          </div>
+        </div>
+        <div class="s2-caveat" role="note">
+          <strong>使用說明</strong>
+          <span>下方為「馬太鞍溪堰塞湖土砂變遷分析」儀表板嵌入顯示，數值與圖表以原儀表板為準；若畫面空白，請按右上角「開啟原儀表板」。本平台不自動讀取其數值，需要把沖淤結果用在風險演算時，請由儀表板抄錄後手動填入調查參數。</span>
+        </div>
+        <div class="fanb-grid">
+          <article class="s2-overview-card">
+            <div class="s2-card-head"><div><span class="section-kicker">Method</span><h3>資料與方法（依儀表板說明）</h3></div></div>
+            <ul class="s2-small">
+              <li>資料：五期 1 m DEM（2025/8/16、2025/9/25、2025/10/13、2026/3/14、2026/9/14），另有 2025/9/27、11/16 兩期空拍正射影像。</li>
+              <li>處理：重取樣至 5 m 共同網格，扣除穩定區系統偏差，偵測門檻 |Δz| &gt; 1 m。</li>
+              <li>比對：各期以 2025/9/25 為基準直接相減，分期數值為累積值逐期相減。</li>
+              <li>座標：TWD97 / TM2（EPSG:3826）。A、B、C 為目視劃定的近似範圍，D 依礫石河道範圍劃定。</li>
+            </ul>
+          </article>
+          <article class="s2-overview-card">
+            <div class="s2-card-head"><div><span class="section-kicker">Use in risk assessment</span><h3>與風險評估的對應</h3></div></div>
+            <ul class="s2-small">
+              <li>B 殘壩區每日流失速率：對照壩體殘留量與再次堵塞或潰決情境的判斷。</li>
+              <li>A+B 流失量與留存比例：對照庫容剖面與壩體體積（VD）的更新。</li>
+              <li>縱斷面與河床高程：對照下游河床抬升與洪水位、保全對象的相對高程。</li>
+              <li>門檻 1 m 與穩定區偏差校正只能代表大尺度土砂量，小於 1 m 的變化不計入。</li>
+            </ul>
+          </article>
+        </div>
+        <article class="s2-overview-card">
+          <div class="s2-card-head"><div><span class="section-kicker">Original dashboard</span><h3>馬太鞍溪堰塞湖土砂變遷分析</h3></div></div>
+          <iframe id="sedimentFrame" class="sed-frame" title="馬太鞍溪堰塞湖土砂變遷分析儀表板" data-src="https://mataian-dam-sediment-dashboard.pages.dev/" referrerpolicy="no-referrer"></iframe>
+        </article>
+        <p class="s2-source">資料來源：馬太鞍溪堰塞湖土砂變遷分析儀表板（mataian-dam-sediment-dashboard.pages.dev）。本平台僅嵌入顯示，分析方法與數值以原儀表板為準。</p>
       </section>
 
       <section class="page" id="report">

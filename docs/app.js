@@ -22,6 +22,7 @@ const pageTitles = {
   monitor: "SAR監測",
   fanb: "林保署監測",
   sentinel2: "Sentinel-2監測",
+  sediment: "土砂變遷",
   report: "通報報告",
   ai: "專家摘要"
 };
@@ -1368,6 +1369,8 @@ function showPage(pageId) {
   terrainFrame?.contentWindow?.postMessage({type: 'terrain-visibility', active: pageId === 'model3d'}, location.origin);
   if (pageId === 'model3d' && typeof gis3dSchedule === 'function') gis3dSchedule();
   if (pageId === 'fanb' && typeof fanbShow === 'function') setTimeout(fanbShow, 0);   // 延後：網址直接開 #fanb 時程式尚未載入完
+  const sedimentFrame = document.querySelector('#sedimentFrame');
+  if (pageId === 'sediment' && sedimentFrame && !sedimentFrame.getAttribute('src')) sedimentFrame.src = sedimentFrame.dataset.src;   // 開頁才載入，避免拖慢首頁
   if (pageTitles[pageId] && location.hash !== `#${pageId}`) history.replaceState(null, '', `#${pageId}`);
   if (pageId === "gis" && spatialState.map) {
     setTimeout(() => spatialState.map.invalidateSize(), 120);
