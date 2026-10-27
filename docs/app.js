@@ -3779,6 +3779,31 @@ selectTerrainMetadata('matayan_20250930').catch(error => console.warn(error.mess
 // ================================================================ 空間研判連動：Sentinel-2 月圖層、自動圈繪、實測 DSM 高程
 var gisS2 = { overlay: null, outlines: null, marks: null, regions: null, vec: {}, opacity: 0.7, pane: null };
 
+// ---- Sentinel-2 超解析 2.5 m 視覺輔助圖層（tools/s2_superres_monthly.py 產製）----
+// 以獨立 sidecar 索引（assets/sentinel2/sr/sr_index.json）載入，不依賴 sentinel2_monthly.json，
+// 月監測程式重寫該檔時不會洗掉超解析欄位。索引不存在時選項自動停用。
+var srIndex = null;
+async function srLoad() {
+  try {
+    const r = await fetch("./assets/sentinel2/sr/sr_index.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    if (!d || !Array.isArray(d.corners_ll) || d.corners_ll.length < 3 || !d.months) throw new Error("索引格式不符");
+    srIndex = d;
+  } catch (e) {
+    srIndex = null;
+  }
+  const opt = document.querySelector('#gisS2Layer option[value="tc_sr"]');
+  if (opt) {
+    opt.disabled = !srIndex;
+    opt.textContent = srIndex
+      ? `Sentinel-2 超解析 2.5 m（AI 推估，僅供目視；${Object.keys(srIndex.months).length} 個月）`
+      : "Sentinel-2 超解析 2.5 m（尚無資料）";
+  }
+  if (document.querySelector("#gisS2Layer")?.value === "tc_sr" && typeof gisS2Render === "function") gisS2Render();
+}
+setTimeout(srLoad, 1200);
+
 // 仿射貼圖：Sentinel-2 影像為 UTM 網格，與 Web Mercator 底圖有約 0.7° 旋轉；以左上、右上、左下三角經緯度精確貼合
 const GisAffineOverlay = window.L ? L.ImageOverlay.extend({
   initialize(url, corners, options) {
@@ -3819,6 +3844,7 @@ const GIS_REGION_STYLE = {
 };
 const GIS_LAYER_NOTE = {
   tc: "Sentinel-2 當月去雲合成真色（10 m）；可拉透明度與 Esri 高解析影像比對崩塌邊界。",
+  tc_sr: "【僅供目視】Sentinel-2 超解析 2.5 m 為 AI 模型推估紋理，非實際量測；圈繪 AL／壩體與各項計算仍以 10 m 與 UAV 為準，勿以此圖定邊界。",
   ndvi: "褐色＝裸露（NDVI < 0.25）、綠色＝植生。",
   zanom: "紅＝植物比往年同月少、綠＝比往年多（2019–2024 同月份基準）。",
   dprev: "紅＝比上個月植物少、綠＝比上個月多。",
@@ -3885,15 +3911,26 @@ async function gisS2Render() {
   const scenes = m.scenes || [];
   const notes = [];
   const saviP = layer.startsWith("savi:") && typeof saviState !== "undefined" ? (saviState.layers || []).find((p) => p.key === layer.slice(5)) : null;
-  const url = saviP ? null : layer && m.images?.[layer];
+  const srM = layer === "tc_sr" ? srIndex?.months?.[m.month] : null;
+  const url = saviP ? null : layer === "tc_sr" ? srM?.url : layer && m.images?.[layer];
   if (saviP && GisAffineOverlay) {
     gisS2.overlay = new GisAffineOverlay(saviP.url, saviP.corners_ll, { opacity: gisS2.opacity, interactive: false, pane: "gisS2Pane" }).addTo(map);
     notes.push(saviP.desc);
   } else if (layer.startsWith("savi:")) notes.push("SAVI 資料載入中，請稍候再選一次。");
-  if (layer && !saviP && !layer.startsWith("savi:") && !url) notes.push(`${m.roc_month} 沒有此圖層（整月雲遮或資料不足），請切換月份。`);
+  if (layer && !saviP && !layer.startsWith("savi:") && !url) {
+    notes.push(layer === "tc_sr" && !srIndex
+      ? "超解析圖層尚未產製或載入失敗。"
+      : `${m.roc_month} 沒有此圖層（${layer === "tc_sr" ? "雲遮過多未產製超解析，或尚未處理此月" : "整月雲遮或資料不足"}），請切換月份。`);
+  }
   if (url && GisAffineOverlay) {
-    gisS2.overlay = new GisAffineOverlay(url, s2State.data.view.corners_ll, { opacity: gisS2.opacity, interactive: false, pane: "gisS2Pane" }).addTo(map);
-    notes.push(`${GIS_LAYER_NOTE[layer] || ""}影像日期：${scenes.map((x) => x.date.slice(5).replace("-", "/")).join("、") || "—"}；白色＝雲遮。`);
+    // 超解析圖為壩區裁切（自有角點）；其餘圖層沿用整幅 view 角點
+    const corners = layer === "tc_sr" ? srIndex.corners_ll : s2State.data.view.corners_ll;
+    gisS2.overlay = new GisAffineOverlay(url, corners, { opacity: gisS2.opacity, interactive: false, pane: "gisS2Pane" }).addTo(map);
+    if (layer === "tc_sr") {
+      notes.push(`${GIS_LAYER_NOTE.tc_sr}影像日期：${(srM.scenes || []).map((d) => d.slice(5).replace("-", "/")).join("、") || "—"}（${srM.mode === "composite" ? "月合成" : "單景"}，有效 ${srM.valid_pct}%）；透明＝雲遮，未做超解析。`);
+    } else {
+      notes.push(`${GIS_LAYER_NOTE[layer] || ""}影像日期：${scenes.map((x) => x.date.slice(5).replace("-", "/")).join("、") || "—"}；白色＝雲遮。`);
+    }
   }
   // 區域輪廓
   if (gisS2.outlines) { map.removeLayer(gisS2.outlines); gisS2.outlines = null; }
