@@ -12,6 +12,7 @@ Sentinel-2 逐月超解析（視覺輔助圖層）：10 m -> 2.5 m
   2. 以 PySTAC 查 Microsoft Planetary Computer 的 Sentinel-2 L2A（同月、同圖幅 51QUG），
      讀 B04/B03/B02/B08（模型輸入）＋ B11/SCL（去雲用）。
   3. 去雲規則沿用平台月監測：SCL 遮除雲、雲影、卷雲，另以光譜檢核補判，遮罩外擴 20 m。
+     同月 ≥3 景時再做多景檢核（temporal_refine）：還原被誤判為雲的亮白崩積土石（藍光與近紅外皆亮者仍判為雲）。
   4. 單景最佳（best，預設）或月中位數合成（composite）。
   5. 雲遮像元先以鄰近有效值填補再進模型（避免遮罩邊界出現 0 值振鈴），輸出後以遮罩還原為透明。
   6. SEN2SRLite NonReference_RGBN_x4 推論（輸入波段順序 B04, B03, B02, B08）。
@@ -272,8 +273,44 @@ def load_scene(item, aoi):
     b11 = dn_to_reflectance(np.nan_to_num(dn["B11"], nan=0), baseline)
     scl = np.nan_to_num(dn["SCL"], nan=0).astype(np.uint8)
     inv = invalid_mask(scl, refl[2], refl[3], b11, nodata)
+    b02 = refl[2]
+    cloudlike = np.isin(scl, (8, 9, 10)) | ((b02 > 0.2) & (b11 < 0.9 * b02) & (refl[3] > 0.25)) | (b02 > 0.5)
+    hard = nodata | np.isin(scl, (0, 1, 3))
     return {"refl": refl, "invalid": inv, "date": item.datetime.date().isoformat(),
-            "baseline": baseline, "id": item.id}
+            "baseline": baseline, "id": item.id, "cloudlike": cloudlike, "hard": hard}
+
+
+TEMPORAL_MIN_SCENES = 3      # 同月至少 3 景才做多景檢核
+TEMPORAL_CLEAR_DB02 = 0.04   # 被判為雲、但藍光不比當月中位數亮超過此值 → 視為亮白裸露地（崩積土石），還原
+BRIGHT_CLOUD_B02 = 0.30      # 藍光與近紅外都亮 → 雲（崩積土石近紅外約 0.1–0.3，雲 > 0.4），不受多景還原影響
+BRIGHT_CLOUD_B08 = 0.40
+
+
+def temporal_refine(scenes):
+    """同月多景檢核：只用來還原被誤判為雲的亮白崩積土石，不新增遮罩。
+
+    壩區崩積土石亮白，常被 SCL 判為中度雲（8）或光譜補判誤抓。雲會移動、地面不會，
+    所以被判為雲、但藍光（B02）與當月各景逐像元中位數差不多的像元，視為地面還原。
+    藍光與近紅外同時很亮的像元（BRIGHT_CLOUD_*）一律維持為雲。
+    薄霧亮度增加通常 < 0.04，無法可靠分辨，未處理。
+    不足 TEMPORAL_MIN_SCENES 景時維持原遮罩。回傳還原像元比例（各景平均）。
+    """
+    if len(scenes) < TEMPORAL_MIN_SCENES or any("cloudlike" not in s for s in scenes):
+        return None
+    stack = np.stack([np.where(s["hard"], np.nan, s["refl"][2]) for s in scenes])
+    with np.errstate(all="ignore"), warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        ground = np.nanmedian(stack, axis=0)
+    ok = np.isfinite(ground)
+    cleared = 0.0
+    for s in scenes:
+        b02, b08 = s["refl"][2], s["refl"][3]
+        bright = (b02 > BRIGHT_CLOUD_B02) & (b08 > BRIGHT_CLOUD_B08)
+        restore = s["cloudlike"] & ok & (b02 - np.where(ok, ground, 0) <= TEMPORAL_CLEAR_DB02) & ~bright
+        new = dilate(s["hard"] | (s["cloudlike"] & ~restore) | bright, CLOUD_BUFFER_PX)
+        cleared += float((s["invalid"] & ~new).mean())
+        s["invalid"] = new
+    return cleared / len(scenes)
 
 
 def pick_scene(scenes, mode: str, min_valid: float):
@@ -449,6 +486,9 @@ def main(argv=None):
             skipped += 1
             continue
         scenes = [load_scene(i, aoi) for i in items]
+        tr = temporal_refine(scenes)
+        if tr:
+            print(f"[{month}] 同月 {len(scenes)} 景檢核：還原被誤判為雲的亮白裸露地 {tr * 100:.1f}%（各景平均）")
         picked = pick_scene(scenes, args.mode, args.min_valid)
         if picked is None:
             best = max(1 - s["invalid"].mean() for s in scenes)

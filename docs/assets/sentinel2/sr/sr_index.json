@@ -1,0 +1,177 @@
+{
+ "schema_version": 1,
+ "months": {
+  "2025-06": {
+   "mode": "best",
+   "scenes": [
+    "2025-06-15"
+   ],
+   "valid_pct": 97.7,
+   "url": "./assets/sentinel2/sr/2025-06_tc_sr.webp",
+   "size_kb": 275
+  },
+  "2025-07": {
+   "mode": "best",
+   "scenes": [
+    "2025-07-25"
+   ],
+   "valid_pct": 69.6,
+   "url": "./assets/sentinel2/sr/2025-07_tc_sr.webp",
+   "size_kb": 245
+  },
+  "2025-08": {
+   "mode": "best",
+   "scenes": [
+    "2025-08-17"
+   ],
+   "valid_pct": 72.0,
+   "url": "./assets/sentinel2/sr/2025-08_tc_sr.webp",
+   "size_kb": 256
+  },
+  "2025-10": {
+   "mode": "best",
+   "scenes": [
+    "2025-10-11"
+   ],
+   "valid_pct": 99.1,
+   "url": "./assets/sentinel2/sr/2025-10_tc_sr.webp",
+   "size_kb": 233
+  },
+  "2025-11": {
+   "mode": "best",
+   "scenes": [
+    "2025-11-30"
+   ],
+   "valid_pct": 94.1,
+   "url": "./assets/sentinel2/sr/2025-11_tc_sr.webp",
+   "size_kb": 276
+  },
+  "2025-12": {
+   "mode": "best",
+   "scenes": [
+    "2025-12-30"
+   ],
+   "valid_pct": 82.0,
+   "url": "./assets/sentinel2/sr/2025-12_tc_sr.webp",
+   "size_kb": 269
+  },
+  "2026-01": {
+   "mode": "best",
+   "scenes": [
+    "2026-01-19"
+   ],
+   "valid_pct": 70.8,
+   "url": "./assets/sentinel2/sr/2026-01_tc_sr.webp",
+   "size_kb": 242
+  },
+  "2026-02": {
+   "mode": "best",
+   "scenes": [
+    "2026-02-13"
+   ],
+   "valid_pct": 78.9,
+   "url": "./assets/sentinel2/sr/2026-02_tc_sr.webp",
+   "size_kb": 252
+  },
+  "2026-03": {
+   "mode": "best",
+   "scenes": [
+    "2026-03-15"
+   ],
+   "valid_pct": 98.8,
+   "url": "./assets/sentinel2/sr/2026-03_tc_sr.webp",
+   "size_kb": 280
+  },
+  "2026-04": {
+   "mode": "best",
+   "scenes": [
+    "2026-04-14"
+   ],
+   "valid_pct": 99.4,
+   "url": "./assets/sentinel2/sr/2026-04_tc_sr.webp",
+   "size_kb": 272
+  },
+  "2026-05": {
+   "mode": "best",
+   "scenes": [
+    "2026-05-19"
+   ],
+   "valid_pct": 97.4,
+   "url": "./assets/sentinel2/sr/2026-05_tc_sr.webp",
+   "size_kb": 293
+  },
+  "2026-06": {
+   "mode": "best",
+   "scenes": [
+    "2026-06-23"
+   ],
+   "valid_pct": 78.7,
+   "url": "./assets/sentinel2/sr/2026-06_tc_sr.webp",
+   "size_kb": 287
+  },
+  "2026-07": {
+   "mode": "best",
+   "scenes": [
+    "2026-07-08"
+   ],
+   "valid_pct": 81.5,
+   "url": "./assets/sentinel2/sr/2026-07_tc_sr.webp",
+   "size_kb": 273
+  },
+  "2026-08": {
+   "mode": "best",
+   "scenes": [
+    "2026-08-02"
+   ],
+   "valid_pct": 83.0,
+   "url": "./assets/sentinel2/sr/2026-08_tc_sr.webp",
+   "size_kb": 211
+  },
+  "2026-09": {
+   "mode": "best",
+   "scenes": [
+    "2026-09-26"
+   ],
+   "valid_pct": 99.0,
+   "url": "./assets/sentinel2/sr/2026-09_tc_sr.webp",
+   "size_kb": 268
+  },
+  "2026-10": {
+   "mode": "best",
+   "scenes": [
+    "2026-10-21"
+   ],
+   "valid_pct": 68.1,
+   "url": "./assets/sentinel2/sr/2026-10_tc_sr.webp",
+   "size_kb": 264
+  }
+ },
+ "updated_at": "2026-10-29",
+ "title": "Sentinel-2 超解析 2.5 m（視覺輔助）",
+ "model": "SEN2SRLite NonReference_RGBN_x4",
+ "package": "sen2sr 0.8.5",
+ "resolution_m": 2.5,
+ "crs": "EPSG:32651",
+ "size_px": 2048,
+ "bounds_lonlat": [
+  121.269752,
+  23.682905,
+  121.320556,
+  23.729685
+ ],
+ "corners_ll": [
+  [
+   23.729131,
+   121.269752
+  ],
+  [
+   23.729685,
+   121.319964
+  ],
+  [
+   23.682905,
+   121.270362
+  ]
+ ],
+ "note": "AI 推估紋理，僅供目視參考，不可用於量測或圈繪；透明處為雲遮，未做超解析。判釋與計算請以原始 10 m 與 UAV 為準。"
+}
