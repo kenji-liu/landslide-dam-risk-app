@@ -1,24 +1,19 @@
 {
-  "updated": "2026-11-05 10:10",
-  "processed_at": "2026-11-05 10:10",
+  "updated": "2026-11-06 08:04",
+  "processed_at": "2026-11-06 08:04",
   "freshness": {
-    "status": "current",
-    "label": "資料在有效期內",
+    "status": "stale",
+    "label": "資料延遲",
     "latest_acquisition": "2026-10-22",
     "latest_pair": "2026-10-16→2026-10-22",
-    "latency_days": 14,
+    "latency_days": 15,
     "stale_after_days": 14,
-    "message": "最後觀測距今 14 天，尚未超過 14 天門檻。"
+    "message": "最後觀測距今 15 天，已超過 14 天門檻；目前警戒值不能代表即時現況。"
   },
   "ingest": {
-    "checked_at": "2026-11-05T10:10:28+08:00",
-    "status": "ready",
-    "message": "最新相鄰配對 2026-10-16→2026-10-22 已在本機，可供監測分析。",
-    "latest_available_acquisition": "2026-10-22",
-    "latest_target_pair": [
-      "20261016",
-      "20261022"
-    ]
+    "checked_at": "2026-11-06T08:04:23+08:00",
+    "status": "error",
+    "message": "影像取得失敗：ConnectionError: HTTPSConnectionPool(host='cmr.earthdata.nasa.gov', port=443): Max retries exceeded with url: /search/granules.umm_json (Caused by NameResolutionError(\"HTTPSConnection(host='cmr.earthdata.nasa.gov', port=443): Failed to resolve 'cmr.earthdata.nasa.gov' ([Errno 11001] getaddrinfo failed)\"))"
   },
   "thresholds": {
     "yellow_db": -10.0,
