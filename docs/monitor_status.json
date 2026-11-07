@@ -1,19 +1,19 @@
 {
-  "updated": "2026-11-06 08:04",
-  "processed_at": "2026-11-06 08:04",
+  "updated": "2026-11-07 08:00",
+  "processed_at": "2026-11-07 08:00",
   "freshness": {
     "status": "stale",
     "label": "資料延遲",
     "latest_acquisition": "2026-10-22",
     "latest_pair": "2026-10-16→2026-10-22",
-    "latency_days": 15,
+    "latency_days": 16,
     "stale_after_days": 14,
-    "message": "最後觀測距今 15 天，已超過 14 天門檻；目前警戒值不能代表即時現況。"
+    "message": "最後觀測距今 16 天，已超過 14 天門檻；目前警戒值不能代表即時現況。"
   },
   "ingest": {
-    "checked_at": "2026-11-06T08:04:23+08:00",
+    "checked_at": "2026-11-07T08:00:09+08:00",
     "status": "error",
-    "message": "影像取得失敗：ConnectionError: HTTPSConnectionPool(host='cmr.earthdata.nasa.gov', port=443): Max retries exceeded with url: /search/granules.umm_json (Caused by NameResolutionError(\"HTTPSConnection(host='cmr.earthdata.nasa.gov', port=443): Failed to resolve 'cmr.earthdata.nasa.gov' ([Errno 11001] getaddrinfo failed)\"))"
+    "message": "影像取得失敗：HyP3Error: <Response [401]> Invalid authorization token provided: Signature has expired"
   },
   "thresholds": {
     "yellow_db": -10.0,
