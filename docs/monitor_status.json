@@ -1,17 +1,17 @@
 {
-  "updated": "2026-11-20 08:00",
-  "processed_at": "2026-11-20 08:00",
+  "updated": "2026-11-21 08:00",
+  "processed_at": "2026-11-21 08:00",
   "freshness": {
     "status": "stale",
     "label": "資料延遲",
     "latest_acquisition": "2026-10-22",
     "latest_pair": "2026-10-16→2026-10-22",
-    "latency_days": 29,
+    "latency_days": 30,
     "stale_after_days": 14,
-    "message": "最後觀測距今 29 天，已超過 14 天門檻；目前警戒值不能代表即時現況。"
+    "message": "最後觀測距今 30 天，已超過 14 天門檻；目前警戒值不能代表即時現況。"
   },
   "ingest": {
-    "checked_at": "2026-11-20T08:00:06+08:00",
+    "checked_at": "2026-11-21T08:00:06+08:00",
     "status": "error",
     "message": "影像取得失敗：HyP3Error: <Response [401]> Invalid authorization token provided: Signature has expired"
   },
